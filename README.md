@@ -90,15 +90,14 @@
 - 台湾省点击后以省级全幅呈现，并明确提示「台湾省是中国神圣领土不可分割的一部分」；
 - 底图为高德地图（依法取得审图号的公开地图服务），无国界错误、无违规标注。
 
-## 三、本地运行
+## 三、本地运行（双击即可，无需任何环境）
 
-地图数据通过 `fetch` 加载，需以 HTTP 方式访问（不能直接双击 `index.html`）：
+**直接双击 `index.html` 就能打开**，不需要安装 Node、Python，也不需要启动服务器。
 
-```bash
-node tools/serve.mjs        # 默认 http://127.0.0.1:8123/
-```
+实现方式：行政区划与场馆数据以 `.js` 形式按需注入（`window.__GEO_SET`），
+绕开浏览器对 `file://` 下读取本地 JSON 的限制；地图引擎 MapLibre 本身在 `file://` 下可正常工作。
 
-或使用任意静态服务器，例如 `python -m http.server 8123`。
+> 若你更习惯用本地服务器，也可以执行 `node tools/serve.mjs`（默认 <http://127.0.0.1:8123/>）。
 
 ### 深链接（可直接定位到某一层级，便于演示与分享）
 
@@ -117,16 +116,20 @@ node tools/serve.mjs        # 默认 http://127.0.0.1:8123/
 │   ├── style.css            中国红 / 鎏金 / 墨黑 视觉体系
 │   └── app.js               地图与逐级展开的全部逻辑
 ├── data/
-│   ├── geo/                 行政区划边界（省 / 市两级全部本地打包，不依赖第三方接口）
-│   │   ├── 100000_full.json 全国（含台湾、港澳、南海诸岛十段线）
-│   │   └── <adcode>_full.json
-│   ├── gdp.js               GDP 排序数据（省 / 市 / 区县）
-│   └── red-sites.js         广东革命文化与红色记忆场馆名录（64 处）
+│   ├── geo/                 行政区划边界（.js 形式，省 / 市两级全部本地打包）
+│   │   ├── 100000.js        全国（含台湾、港澳、南海诸岛十段线）
+│   │   └── <adcode>.js
+│   ├── gdp.js               展开次序依据（仅用于排序，界面不显示数值）
+│   ├── red-sites.js         红色场馆名录（64 处，名称与地址）
+│   ├── red-sites.geo.js     红色场馆经纬度（地理编码结果，GCJ-02）
+│   └── red-sites.resolved.js 场馆所属区县 / 乡镇归属
 ├── vendor/                  MapLibre GL JS v5.6.0
 └── tools/
-    ├── serve.mjs            本地静态服务器
+    ├── serve.mjs            本地静态服务器（可选）
+    ├── build-jsdata.mjs     JSON → .js 数据转换（改完数据后运行）
     ├── fetch-geo.mjs        重新下载省级行政区划边界
     ├── fetch-geo-districts.mjs  重新下载地级市行政区划边界
+    ├── geocode-red-sites.mjs    场馆地址 → 经纬度（需高德 Web 服务 Key）
     └── validate-data.mjs    校验 GDP 数据键名与边界数据是否匹配
 ```
 

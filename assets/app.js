@@ -578,11 +578,21 @@
     const ad = String(adcode);
     if (CACHE.has(ad)) return CACHE.get(ad);
     if (INFLIGHT.has(ad)) return INFLIGHT.get(ad);
-    const job = fetch(`${GEO}${ad}_full.json`)
-      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(gj => { const feats = normalize(gj); CACHE.set(ad, feats); return feats; })
-      .catch(() => { CACHE.set(ad, []); return []; })
-      .finally(() => INFLIGHT.delete(ad));
+    const job = (async () => {
+      try {
+        if (!window.__GEO[ad]) await window.__loadScript(`${GEO}${ad}.js`);
+        const gj = window.__GEO[ad];
+        if (!gj) throw new Error('empty');
+        const feats = normalize(gj);
+        CACHE.set(ad, feats);
+        return feats;
+      } catch (_) {
+        CACHE.set(ad, []);
+        return [];
+      } finally {
+        INFLIGHT.delete(ad);
+      }
+    })();
     INFLIGHT.set(ad, job);
     return job;
   }
@@ -1594,7 +1604,7 @@
 
       <h3>创作团队</h3>
       <p>广州卫生职业技术学院　2025 级针灸推拿专业</p>
-      <p>伍晟楠　王术清　刘嘉韡　林熹桐　马晟焘　曾庆均</p>
+      <p>马晟焘　王术清　伍晟楠　刘嘉韡　林熹桐　曾庆均</p>
       <p style="font-size:11px;color:#86868b">（按姓氏笔画排名）</p>
 
       <h3>数据与资源致谢</h3>
@@ -1996,7 +2006,9 @@
       booted = true;
 
       try {
-        const gj = await (await fetch(GEO + '100000_full.json')).json();
+        if (!window.__GEO['100000']) await window.__loadScript(GEO + '100000.js');
+        const gj = window.__GEO['100000'];
+        if (!gj) throw new Error('no country data');
         gj.features = gj.features.map(f => ({ ...f, id: String(f.properties.adcode) }));
         countryFC = gj;
         map.getSource('prov').setData(gj);
@@ -2008,9 +2020,9 @@
       }
 
       // 场馆补全区县 / 乡镇归属（失败不影响主流程）
-      try {
-        const res = await (await fetch('./data/red-sites.resolved.json')).json();
-        res.forEach(r => {
+      if (!window.__RED_RESOLVED) { try { await window.__loadScript('./data/red-sites.resolved.js'); } catch (_) {} }
+      if (window.__RED_RESOLVED) {
+        window.__RED_RESOLVED.forEach(r => {
           const s = RED_SITES.find(x => x.name === r.name);
           if (!s) return;
           s.cityAdcode = r.cityAdcode;
@@ -2018,13 +2030,13 @@
           s.districtAdcode = r.districtAdcode;
           s.town = r.town;
         });
-      } catch (_) {}
+      }
 
       // 场馆精确坐标（缺文件则不出点位，避免假点）
-      try {
-        const geo = await (await fetch('./data/red-sites.geo.json')).json();
-        VENUES = geo.filter(v => isFinite(v.lng) && isFinite(v.lat));
-      } catch (_) { VENUES = []; }
+      if (!window.__RED_GEO) { try { await window.__loadScript('./data/red-sites.geo.js'); } catch (_) {} }
+      VENUES = Array.isArray(window.__RED_GEO)
+        ? window.__RED_GEO.filter(v => isFinite(v.lng) && isFinite(v.lat))
+        : [];
 
       addOverlayLayers();
       applyBasemap(true);
