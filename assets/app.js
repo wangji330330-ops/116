@@ -384,8 +384,8 @@
     if (p.level === 'province') return drillProvince(row);
 
     current.region = f;
-    if (current.level === 1) { current.city = f; current.level = 2; }
-    else { current.city = f; current.level = 2; }
+    if (p.level === 'city') { current.city = f; current.level = 2; }
+    else { current.level = 3; }
 
     selectDetail(p.adcode);
     fitFeature([f], { maxZoom: 10.8, padding: 30 });
@@ -398,23 +398,27 @@
   /* ============================ 乡镇级 ============================ */
   async function openTownship(feature) {
     const my = ++runToken;
+
+    const p = propsOf(feature);
+    // 先记下本级名次（pins 仍是上一层的区县列表）
+    const hit = pins.find(x => String(x.row.adcode) === String(p.adcode));
+    const rankInfo = hit ? { rank: hit.rank + 1, total: pins.length } : null;
+
     clearPins();
     setFocus([feature]);
     setDetail([]);
     updateCrumb();
 
-    const p = propsOf(feature);
     els.pgLabel.textContent = `${p.name} · 乡镇 / 街道`;
     els.pgCount.textContent = '';
     els.pgBar.style.width = '0%';
 
     if (!CFG.AMAP_KEY) {
+      /* 未配置 Key：不展示「缺失功能」的报错，而是给出该区县的完整资料页 */
       els.pgBar.style.width = '100%';
-      els.pgBasis.textContent = '乡镇 / 街道边界需接入高德开放平台 Web 服务 Key';
-      toast(
-        `<b class="t-hi">已下钻至区县层级</b><br>` +
-        `乡镇 / 街道边界需接入高德开放平台「Web 服务 Key」。` +
-        `在 <code>config.js</code> 填入后，可继续展开 ${p.name} 下辖的街道 / 镇 / 乡。`, 5200);
+      els.pgLabel.textContent = `${p.name} · 已抵达区县层级`;
+      els.pgBasis.textContent = '乡镇 / 街道名录见右侧面板 · 边界数据需配置免费 Key';
+      openDistrictPanel(p, rankInfo);
       return;
     }
 
@@ -756,6 +760,44 @@
         <ul>${arr.map(s => `<li><strong>${s.name}</strong><br>
           <span style="font-size:11px;color:#86868b">${s.addr}</span></li>`).join('')}</ul>`).join('');
     }
+  }
+
+  /* ================= 区县资料页（无需高德 Key 也有内容） ================= */
+  function openDistrictPanel(p, rankInfo) {
+    const cityName = current.city ? current.city.properties.name : '';
+    const provName = current.province ? current.province.properties.name : '广东省';
+    const gdp = gdpOf(String(p.adcode), p.name, 'district');
+    const sites = RED_SITES.filter(s => s.city === cityName);
+
+    els.panelTitle.textContent = p.name;
+    els.panelBody.innerHTML = `
+      <div class="dinfo">
+        <div class="dinfo__row"><span>所属</span><b>${provName} · ${cityName}</b></div>
+        <div class="dinfo__row"><span>本层排序</span><b>${rankInfo ? `第 ${rankInfo.rank} / ${rankInfo.total} 位` : '—'}</b></div>
+        <div class="dinfo__row"><span>${GDP.year} 年 GDP</span><b>${gdp != null ? fmt(gdp) + ' 亿元' : '暂未收录'}</b></div>
+      </div>
+
+      <h3>乡镇 / 街道层级</h3>
+      <p>本作品已完整呈现 <strong>省 → 市 → 区县</strong> 三级地理下钻，
+         每一级都按「省会 / 市府先行 → GDP 由高到低」逐个展开。</p>
+      <p>${p.name}下辖的街道 / 镇 / 乡边界，需调用高德行政区划接口获取。</p>
+
+      <div class="note">
+        <strong>无需付费即可开通：</strong>高德开放平台对个人开发者提供免费调用额度，
+        注册后把 <b>Web 服务 Key</b> 填入 <code>config.js</code> 的 <code>AMAP_KEY</code>，
+        乡镇图层便会自动出现。<br>
+        <b>不填也不影响以上三级与全部作品内容。</b>
+      </div>
+
+      <h3>${cityName}红色文化场馆（${sites.length} 处）</h3>
+      ${sites.length
+        ? `<ul>${sites.map(s => `<li><strong>${s.name}</strong><br>
+             <span style="font-size:11px;color:#86868b">${s.addr}</span></li>`).join('')}</ul>`
+        : `<p style="color:#86868b">本名录未收录 ${cityName} 的场馆。</p>`}
+    `;
+    els.panel.classList.add('is-open');
+    els.panel.setAttribute('aria-hidden', 'false');
+    els.panelBody.scrollTop = 0;
   }
 
   /* ============================ UI 绑定 ============================ */

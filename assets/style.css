@@ -427,6 +427,26 @@ body.lbl-compact .pin--prov .pin__name { font-size: 10.5px; }
 }
 .panel__body th { color: var(--gold); font-size: 11px; letter-spacing: 1px; }
 
+/* 区县资料页信息卡 */
+.dinfo {
+  border: 1px solid rgba(201, 162, 39, .32);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 6px;
+  background: rgba(201, 162, 39, .05);
+}
+.dinfo__row {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; padding: 9px 13px; font-size: 12.5px;
+  border-bottom: 1px solid rgba(201, 162, 39, .16);
+}
+.dinfo__row:last-child { border-bottom: 0; }
+.dinfo__row span { color: var(--ink-3); flex: none; }
+.dinfo__row b {
+  color: var(--ink); font-weight: 700; text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ================= Toast ================= */
 .toast {
   position: absolute; z-index: 70;
