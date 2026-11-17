@@ -48,18 +48,23 @@ window.addEventListener('unhandledrejection', function (e) {
     <div class="seal">思政<br>地图</div>
     <div class="titles">
       <h1>数绘湾区红脉<span class="dot">·</span>践行医者初心</h1>
-      <p>粤港澳大湾区红色文化资源 · 思政数字地图</p>
     </div>
   </header>
 
   <!-- 右上：控件 -->
   <div class="hud hud--tools" data-ui>
-    <button class="tool" id="btn-hide" title="隐藏界面，便于查看地图（快捷键 H）">隐藏界面</button>
+    <button class="tool" id="btn-hide" title="隐藏界面（快捷键 H）">隐</button>
     <button class="tool" id="btn-3d" title="广东 3D 立体地图">3D</button>
-    <button class="tool" id="btn-replay" title="重播开场">重播</button>
-    <button class="tool" id="btn-basemap" title="切换底图">卫星图</button>
-    <button class="tool" id="btn-panel" title="展开说明">说明</button>
-    <button class="tool" id="btn-full" title="全屏">全屏</button>
+    <button class="tool" id="btn-replay" title="重播开场">↻</button>
+    <button class="tool" id="btn-basemap" title="切换卫星 / 标准底图">卫</button>
+    <button class="tool" id="btn-panel" title="作品说明">说</button>
+    <button class="tool" id="btn-full" title="全屏">全</button>
+  </div>
+
+  <!-- 红色传承提示（当某地铺满屏幕 75% 以上时出现） -->
+  <div class="hud hud--red" id="redpanel" data-ui hidden>
+    <div class="red__hd" id="red-title"></div>
+    <div class="red__body" id="red-body"></div>
   </div>
 
   <!-- 左上：搜索 -->
@@ -123,7 +128,7 @@ window.addEventListener('unhandledrejection', function (e) {
 
   <!-- 隐藏界面后的恢复按钮（始终可点） -->
   <button class="ui-restore" id="btn-show" title="显示界面（快捷键 H）">
-    <span class="ui-restore__ico">▤</span> 显示界面
+    <span class="ui-restore__ico">显</span>
   </button>
 
 </div>

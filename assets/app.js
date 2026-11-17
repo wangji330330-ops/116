@@ -413,13 +413,67 @@
     requestAnimationFrame(() => spotEl.classList.add('is-on'));
   }
 
+  /* ============================ 点击命中（自绘几何判定） ============================ */
+  /* 不依赖 queryRenderedFeatures：直接对已加载的 GeoJSON 做点面判定，
+     这样无论填充多淡、渲染状态如何，点区块都一定能命中 */
+  let detailFeats = [];
+  let contextFeats = [];
+
+  function pointInRing(pt, ring) {
+    let inside = false;
+    const x = pt[0], y = pt[1];
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const xi = ring[i][0], yi = ring[i][1];
+      const xj = ring[j][0], yj = ring[j][1];
+      if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+    }
+    return inside;
+  }
+
+  function pointInGeometry(pt, geom) {
+    if (!geom) return false;
+    const polys = geom.type === 'Polygon' ? [geom.coordinates]
+      : geom.type === 'MultiPolygon' ? geom.coordinates : [];
+    for (const poly of polys) {
+      if (!poly || !poly.length) continue;
+      if (!pointInRing(pt, poly[0])) continue;
+      let hole = false;
+      for (let r = 1; r < poly.length; r++) {
+        if (pointInRing(pt, poly[r])) { hole = true; break; }
+      }
+      if (!hole) return true;
+    }
+    return false;
+  }
+
+  function hitTest(lngLat) {
+    const pt = [lngLat.lng, lngLat.lat];
+    // 优先级：本层下级（最细）→ 同级上下文 → 省级
+    const sets = [detailFeats, contextFeats, countryFC ? countryFC.features : []];
+    for (const list of sets) {
+      for (const f of list) {
+        if (!f.properties || !f.properties.level) continue;   // 跳过南海诸岛等辅助要素
+        if (f.geometry && pointInGeometry(pt, f.geometry)) return f;
+      }
+    }
+    return null;
+  }
+
+  function sourceOfFeature(f) {
+    const ad = String(f.properties.adcode);
+    if (detailFeats.some(x => String(x.properties.adcode) === ad)) return 'detail';
+    if (contextFeats.some(x => String(x.properties.adcode) === ad)) return 'context';
+    return 'prov';
+  }
+
   /* ============================ 图层数据 ============================ */
   function setDetail(features) {
     selDetailId = null;
+    detailFeats = features || [];
     const s = map.getSource('detail');
     if (!s) return;
-    s.setData({ type: 'FeatureCollection', features });
-    features.forEach(f => setState('detail', f.properties.adcode, { reveal: 0, hover: false, selected: false }));
+    s.setData({ type: 'FeatureCollection', features: detailFeats });
+    detailFeats.forEach(f => setState('detail', f.properties.adcode, { reveal: 0, hover: false, selected: false }));
   }
 
   function setFocus(features) {
@@ -431,11 +485,10 @@
      例如进入广州市后，广东省其余 20 个市依然可见、可点，直接跳转即可。 */
   function setContext(features) {
     const s = map.getSource('context');
-    if (!s) return;
     const cur = current.region ? String(current.region.properties.adcode) : null;
-    const list = (features || []).filter(f => String(f.properties.adcode) !== cur);
-    s.setData({ type: 'FeatureCollection', features: list });
-    list.forEach(f => setState('context', f.properties.adcode, { hover: false }));
+    contextFeats = (features || []).filter(f => String(f.properties.adcode) !== cur);
+    if (s) s.setData({ type: 'FeatureCollection', features: contextFeats });
+    contextFeats.forEach(f => setState('context', f.properties.adcode, { hover: false }));
   }
 
   /* 取某个区域的同级兄弟（其父级的全部下级）
@@ -583,6 +636,7 @@
       els.pgLabel.textContent = `已展开 ${rows.length} 个${kind === 'city' ? '市 / 州' : '区 / 县'}`;
       els.pgBasis.textContent = basis + ' · 点击任一区域继续下钻';
       schedulePrefetch(rows);
+      updateRedFocus();
     }
   }
 
@@ -1157,6 +1211,85 @@
     toast('广东 <b class="t-hi">3D 立体地图</b>：柱体高度 = 该市收录的红色场馆数量', 4600);
   }
 
+  /* ============================ 红色传承：铺满屏幕即显示 ============================ */
+  /* 当某个行政区在屏幕上占的面积达到视口 75% 时，显示该地的红色场馆；
+     高亮只画它自己的地块，不会溢到别的市 / 区去 */
+  const COVER_THRESHOLD = 0.75;
+  let redFocusId = null;
+  let redPanelTimer = null;
+
+  function coverageOf(feature) {
+    const b = bboxOf([feature]);
+    if (!isFinite(b[0])) return 0;
+    const p1 = map.project([b[0], b[3]]);
+    const p2 = map.project([b[2], b[1]]);
+    const x0 = Math.max(0, Math.min(p1.x, p2.x));
+    const x1 = Math.min(window.innerWidth, Math.max(p1.x, p2.x));
+    const y0 = Math.max(0, Math.min(p1.y, p2.y));
+    const y1 = Math.min(window.innerHeight, Math.max(p1.y, p2.y));
+    if (x1 <= x0 || y1 <= y0) return 0;
+    return ((x1 - x0) * (y1 - y0)) / (window.innerWidth * window.innerHeight);
+  }
+
+  function sitesOfRegion(props) {
+    // 市：按市名匹配；区县：按区县名匹配
+    if (props.level === 'province') return RED_SITES;
+    if (props.level === 'city') return RED_SITES.filter(s => s.city === props.name);
+    if (props.level === 'district') {
+      return RED_SITES.filter(s => s.district === props.name ||
+        (!s.district && s.city && current.city && s.city === current.city.properties.name));
+    }
+    return [];
+  }
+
+  function updateRedFocus() {
+    clearTimeout(redPanelTimer);
+    redPanelTimer = setTimeout(() => {
+      const pool = detailFeats.length ? detailFeats : contextFeats;
+      let best = null, bestCov = 0;
+      for (const f of pool) {
+        if (!f.properties || !f.properties.level) continue;
+        const c = coverageOf(f);
+        if (c > bestCov) { bestCov = c; best = f; }
+      }
+
+      const panel = document.getElementById('redpanel');
+      const title = document.getElementById('red-title');
+      const body = document.getElementById('red-body');
+      if (!panel) return;
+
+      if (!best || bestCov < COVER_THRESHOLD) {
+        panel.hidden = true;
+        setRedFocus(null);
+        return;
+      }
+
+      const p = best.properties;
+      const id = String(p.adcode);
+      if (id !== redFocusId) {
+        redFocusId = id;
+        setRedFocus(best);
+      }
+
+      const sites = sitesOfRegion(p);
+      title.innerHTML = `${esc(p.name)}<small>红色传承 · ${sites.length} 处</small>`;
+      body.innerHTML = sites.length
+        ? `<ul>${sites.slice(0, 6).map(s => `<li>${esc(s.name)}</li>`).join('')}</ul>` +
+          (sites.length > 6 ? `<div class="more">…等 ${sites.length} 处，可在「说」中查看全部</div>` : '')
+        : '<div class="none">该区域暂无收录的红色场馆</div>';
+      panel.hidden = false;
+    }, 120);
+  }
+
+  function setRedFocus(feature) {
+    const s = map.getSource('redfocus');
+    if (!s) return;
+    s.setData({
+      type: 'FeatureCollection',
+      features: feature ? [feature] : []
+    });
+  }
+
   /* ============================ 说明面板 ============================ */
   /* ---------- 红色场馆：省 › 市 › 区县 › 乡镇 四级树 ---------- */
   function buildRedTree() {
@@ -1223,9 +1356,16 @@
   function buildAbout() {
     return `
       <h3>作品主题</h3>
-      <p><strong>数绘湾区红脉 · 践行医者初心</strong>——以国家标准公开版地图为底图，
-      用「地球 → 中国 → 省 → 市 → 区县 → 乡镇」的逐级下钻，
+      <p><strong>数绘湾区红脉 · 践行医者初心</strong>——粤港澳大湾区红色文化资源思政数字地图。</p>
+      <p>以国家标准公开版地图为底图，用「地球 → 中国 → 省 → 市 → 区县」的逐级下钻，
       呈现广东红色文化资源与医疗卫生事业的空间脉络。</p>
+
+      <div class="note">
+        <strong>收录范围：</strong>本作品<strong>仅收录广东省</strong>的红色场馆与红色文化资源
+        （依据课程附件《广东革命文化与红色记忆场馆名录》，共 ${RED_SITES.length} 处）。
+        <strong>未收录其他省、自治区、直辖市的红色点位</strong>；
+        点开其他省份时仅显示行政区划，不含场馆数据。
+      </div>
 
       <h3>交互创意</h3>
       <ul>
@@ -1351,7 +1491,8 @@
     }
     document.addEventListener('fullscreenchange', () => {
       const on = !!document.fullscreenElement;
-      btnFull && (btnFull.textContent = on ? '退出全屏' : '全屏');
+      btnFull && (btnFull.textContent = on ? '退' : '全');
+      btnFull && (btnFull.title = on ? '退出全屏' : '全屏');
       // 全屏改变可视区域，必须让地图重新计算尺寸
       requestAnimationFrame(() => { map.resize(); scheduleDeclutter(); });
       setTimeout(() => { map.resize(); scheduleDeclutter(); }, 260);
@@ -1361,7 +1502,8 @@
     document.getElementById('btn-basemap').onclick = ev => {
       baseMode = baseMode === 'vec' ? 'sat' : 'vec';
       ev.currentTarget.classList.toggle('is-on', baseMode === 'sat');
-      ev.currentTarget.textContent = baseMode === 'sat' ? '标准图' : '卫星图';
+      ev.currentTarget.textContent = baseMode === 'sat' ? '标' : '卫';
+      ev.currentTarget.title = baseMode === 'sat' ? '当前为卫星图，点击切换标准图' : '当前为标准图，点击切换卫星图';
       applyBasemap(true);
     };
     document.getElementById('btn-panel').onclick = openPanel;
@@ -1447,6 +1589,15 @@
       id: 'focus-line', type: 'line', source: 'focus',
       paint: { 'line-color': RED_DEEP, 'line-width': 2.6, 'line-opacity': 0.9 }
     });
+    /* 红色传承高亮：只填该地块本身，天然不会溢出到相邻行政区 */
+    map.addLayer({
+      id: 'redfocus-fill', type: 'fill', source: 'redfocus',
+      paint: { 'fill-color': RED, 'fill-opacity': 0.20 }
+    });
+    map.addLayer({
+      id: 'redfocus-line', type: 'line', source: 'redfocus',
+      paint: { 'line-color': RED_DEEP, 'line-width': 3, 'line-opacity': 0.95 }
+    });
     /* 同级上下文：当前区域的「兄弟」行政区，保持可见且可点击，
        随时可以直接跳到别的省 / 市 / 区县，不必先退回上一级 */
     map.addLayer({
@@ -1490,27 +1641,35 @@
   }
 
   function bindMapEvents() {
-    /* —— 悬停：显示所属 + 预取下一级边界 —— */
-    ['prov-fill', 'context-fill', 'detail-fill'].forEach(layer => {
-      map.on('mousemove', layer, e => {
-        map.getCanvas().style.cursor = 'pointer';
-        const f = e.features && e.features[0];
-        if (!f) return;
-        setState(f.source, f.id, { hover: true });
+    /* —— 悬停：显示所属 + 预取下一级边界（自绘判定，rAF 节流） —— */
+    let hovRaf = 0, hovEv = null, hovKey = null, hovSrc = 'prov';
+    map.on('mousemove', e => {
+      hovEv = e;
+      if (hovRaf) return;
+      hovRaf = requestAnimationFrame(() => {
+        hovRaf = 0;
+        const ev = hovEv;
+        if (!ev) return;
+        const f = hitTest(ev.lngLat);
+        const key = f ? String(f.properties.adcode) : null;
 
-        // 悬停预取：真正点下去时边界已在内存里
-        const p = f.properties || {};
+        if (hovKey && hovKey !== key) {
+          try { map.setFeatureState({ source: hovSrc, id: hovKey }, { hover: false }); } catch (_) {}
+        }
+        if (!f) { hideTip(); map.getCanvas().style.cursor = ''; hovKey = null; return; }
+
+        const src = sourceOfFeature(f);
+        try { map.setFeatureState({ source: src, id: key }, { hover: true }); } catch (_) {}
+        hovKey = key; hovSrc = src;
+
+        const p = f.properties;
         if (p.adcode && (p.level === 'province' || p.level === 'city')) prefetchChildren(p.adcode);
-
-        showTip(p, e.point);
-      });
-      map.on('mouseleave', layer, e => {
-        map.getCanvas().style.cursor = '';
-        const f = e.features && e.features[0];
-        if (f) setState(f.source, f.id, { hover: false });
-        hideTip();
+        map.getCanvas().style.cursor = 'pointer';
+        showTip(p, ev.point);
       });
     });
+
+    map.on('mouseout', () => { hideTip(); map.getCanvas().style.cursor = ''; });
 
     /* —— 点击：无论当前在哪一级，点谁就进入谁 —— */
     function enterAt(f, point) {
@@ -1528,17 +1687,17 @@
       return drillInto({ f });
     }
 
-    map.on('click', 'prov-fill', e => {
-      // 若点击处落在下级区域上，交给更内层处理，避免重复下钻
-      if (map.queryRenderedFeatures(e.point, { layers: ['detail-fill', 'context-fill'] }).length) return;
-      enterAt(e.features && e.features[0], e.point);
+    /* —— 点击：无论当前在哪一级，点谁就进入谁（自绘几何判定，稳定命中） —— */
+    map.on('click', e => {
+      const f = hitTest(e.lngLat);
+      if (f) enterAt(f, e.point);
     });
 
-    map.on('click', 'context-fill', e => enterAt(e.features && e.features[0], e.point));
-    map.on('click', 'detail-fill', e => enterAt(e.features && e.features[0], e.point));
-
     /* 地图一移动就收起信息卡，保证拖动永远不被遮挡 */
-    map.on('movestart dragstart zoomstart', () => { hideSpot(); hideTip(); });
+    /* 地图一移动就收起信息卡，保证拖动永远不被遮挡
+       （MapLibre 的 on() 不支持空格分隔事件名，必须逐个绑定） */
+    ['movestart', 'dragstart', 'zoomstart'].forEach(ev =>
+      map.on(ev, () => { hideSpot(); hideTip(); }));
 
     /* 球面/平面投影在两极附近都会出现瓦片拉花，
        限制中心纬度，避免把极点拖到屏幕中央 */
@@ -1550,9 +1709,9 @@
       }
     });
 
-    map.on('moveend', () => { applyBasemap(); updateLabelMode(); scheduleDeclutter(); });
+    map.on('moveend', () => { applyBasemap(); updateLabelMode(); scheduleDeclutter(); updateRedFocus(); });
     map.on('zoom', () => { applyBasemap(); updateLabelMode(); });
-    map.on('resize', () => scheduleDeclutter());
+    map.on('resize', () => { scheduleDeclutter(); updateRedFocus(); });
   }
 
   /* ============================ 启动 ============================ */
@@ -1568,6 +1727,7 @@
           vec:  { type: 'raster', tiles: AMAP_STREET, tileSize: 256, maxzoom: 18 },
           prov:   { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
           focus:  { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
+          redfocus: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
           context: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
           detail: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } }
         },
@@ -1601,6 +1761,13 @@
 
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
     map.touchZoomRotate.disableRotation();
+    /* 滚轮缩放：以鼠标位置为锚点，滚到哪放大到哪，不必再去点左下进度条 */
+    try {
+      map.scrollZoom.enable();
+      map.scrollZoom.setZoomRate(1 / 260);   // 默认 1/450，调快一些
+    } catch (_) {}
+    try { map.doubleClickZoom.enable(); } catch (_) {}
+    try { map.boxZoom.disable(); } catch (_) {}
     window.__map = map;   // 便于现场调试与作品演示
     map.on('error', e => { if (e && e.error) console.warn('[map]', e.error.message); });
 
