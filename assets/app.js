@@ -284,21 +284,19 @@
   }
 
   /* ============================ 读取下级 ============================ */
-  async function loadChildren(adcode, useLocal) {
+  /* 全部行政区划边界均已本地打包（省级 + 地级市），
+     不依赖任何第三方接口，打开即用、离线可用 */
+  async function loadChildren(adcode) {
     const ad = String(adcode);
     if (CACHE.has(ad)) return CACHE.get(ad);
-    const url = useLocal ? `${GEO}${ad}_full.json`
-                         : `https://geo.datav.aliyun.com/areas_v3/bound/${ad}_full.json`;
     try {
-      const r = await fetch(url);
+      const r = await fetch(`${GEO}${ad}_full.json`);
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const gj = await r.json();
       const feats = gj.features.map(f => ({ ...f, id: String(f.properties.adcode) }));
       CACHE.set(ad, feats);
       return feats;
     } catch (_) {
-      // 兼容：本地没有时回退远端
-      if (useLocal) return loadChildren(ad, false);
       CACHE.set(ad, []);
       return [];
     }
@@ -313,7 +311,7 @@
     const adcode = String(p.adcode);
     const name = p.name;
     const isProv = p.level === 'province';
-    const feats = await loadChildren(adcode, isProv);
+    const feats = await loadChildren(adcode);
     if (my !== runToken) return;
 
     setFocus([feature]);
@@ -631,7 +629,7 @@
         await drillInto({ f });
         await sleep(2400);
       }
-      pool = await loadChildren(code, f.properties.level === 'province');
+      pool = await loadChildren(code);
     }
   }
 

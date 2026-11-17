@@ -64,7 +64,7 @@ node tools/serve.mjs        # 默认 http://127.0.0.1:8123/
 │   ├── style.css            中国红 / 鎏金 / 墨黑 视觉体系
 │   └── app.js               地图与逐级展开的全部逻辑
 ├── data/
-│   ├── geo/                 行政区划边界（省级本地打包，市县级按需拉取）
+│   ├── geo/                 行政区划边界（省 / 市两级全部本地打包，不依赖第三方接口）
 │   │   ├── 100000_full.json 全国（含台湾、港澳、南海诸岛十段线）
 │   │   └── <adcode>_full.json
 │   ├── gdp.js               GDP 排序数据（省 / 市 / 区县）
@@ -72,9 +72,13 @@ node tools/serve.mjs        # 默认 http://127.0.0.1:8123/
 ├── vendor/                  MapLibre GL JS v5.6.0
 └── tools/
     ├── serve.mjs            本地静态服务器
-    ├── fetch-geo.mjs        重新下载行政区划边界
+    ├── fetch-geo.mjs        重新下载省级行政区划边界
+    ├── fetch-geo-districts.mjs  重新下载地级市行政区划边界
     └── validate-data.mjs    校验 GDP 数据键名与边界数据是否匹配
 ```
+
+> 所有行政区划边界均已离线打包（约 26 MB），因此站点**不依赖任何第三方数据接口**，
+> 只在加载底图瓦片时联网。首次打开与逐级下钻都很快，且不会因外部服务限流而失效。
 
 ## 五、接入乡镇级（可选）
 
