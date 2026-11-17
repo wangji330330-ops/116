@@ -43,26 +43,35 @@ async function geocode(site) {
   ];
 
   for (const q of queries) {
-    const url = 'https://restapi.amap.com/v3/geocode/geo?key=' + encodeURIComponent(KEY) +
-      '&address=' + encodeURIComponent(q.address) +
-      (q.city ? '&city=' + encodeURIComponent(q.city) : '');
-    try {
-      const j = await (await fetch(url)).json();
-      if (j.status === '1' && j.geocodes && j.geocodes.length) {
-        const g = j.geocodes[0];
-        const [lng, lat] = String(g.location).split(',').map(Number);
-        if (isFinite(lng) && isFinite(lat)) {
-          return { lng, lat, level: g.level, matched: g.formatted_address, via: q.address };
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const url = 'https://restapi.amap.com/v3/geocode/geo?key=' + encodeURIComponent(KEY) +
+        '&address=' + encodeURIComponent(q.address) +
+        (q.city ? '&city=' + encodeURIComponent(q.city) : '');
+      try {
+        const j = await (await fetch(url)).json();
+        if (j.status === '1' && j.geocodes && j.geocodes.length) {
+          const g = j.geocodes[0];
+          const [lng, lat] = String(g.location).split(',').map(Number);
+          if (isFinite(lng) && isFinite(lat)) {
+            return { lng, lat, level: g.level, matched: g.formatted_address, via: q.address };
+          }
         }
+        // Key 失效直接终止
+        if (j.info && /INVALID_USER_KEY|INSUFFICIENT/i.test(j.info)) {
+          throw new Error('Key 无效或额度不足: ' + j.info);
+        }
+        // 限流：等待后重试同一查询
+        if (j.info && /QPS|LIMIT|FREQUENT|TOO_FAST/i.test(j.info)) {
+          await new Promise(s => setTimeout(s, 700 * (attempt + 1)));
+          continue;
+        }
+        break;
+      } catch (e) {
+        if (String(e.message).includes('Key 无效')) throw e;
+        await new Promise(s => setTimeout(s, 400));
       }
-      // Key 失效直接终止
-      if (j.info && /INVALID_USER_KEY|INSUFFICIENT/i.test(j.info)) {
-        throw new Error('Key 无效或额度不足: ' + j.info);
-      }
-    } catch (e) {
-      if (String(e.message).includes('Key 无效')) throw e;
     }
-    await new Promise(s => setTimeout(s, 120));   // 限速
+    await new Promise(s => setTimeout(s, 320));   // 限速
   }
   return null;
 }
