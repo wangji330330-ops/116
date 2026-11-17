@@ -12,12 +12,12 @@
 <body>
 
 <script>
-/* 运行期错误收集：写入隐藏节点并输出到控制台，便于排查而不打扰浏览 */
+/* 运行期错误收集：写入隐藏节点并输出到控制台 */
 window.__ERRS = [];
 function __logErr(msg) {
   window.__ERRS.push(msg);
   var d = document.getElementById('diag');
-  if (d) d.textContent = window.__ERRS.join(' || ');
+  if (d) d.textContent = 'ERR ' + window.__ERRS.join(' || ');
   console.error('[szMap]', msg);
 }
 window.addEventListener('error', function (e) {
@@ -27,79 +27,90 @@ window.addEventListener('unhandledrejection', function (e) {
   __logErr('REJECT ' + ((e.reason && e.reason.message) || String(e.reason)));
 });
 </script>
-<div id="diag" hidden></div>
 
-<!-- ============ 地图 ============ -->
-<div id="map" aria-label="中国思政数字地图"></div>
+<!-- 全屏作用于 #app，保证界面控件一并进入全屏 -->
+<div id="app">
 
-<!-- ============ 载入动画 ============ -->
-<div id="boot" class="boot">
-  <div class="boot__seal">思政<br>地图</div>
-  <div class="boot__text">
-    <p class="boot__t1">数绘湾区红脉 <span>·</span> 践行医者初心</p>
-    <p class="boot__t2">正在加载国家标准版底图…</p>
-  </div>
-  <div class="boot__bar"><i></i></div>
-</div>
+  <div id="map" aria-label="中国思政数字地图"></div>
 
-<!-- ============ 左上：标题 ============ -->
-<header class="hud hud--title">
-  <div class="seal">思政<br>地图</div>
-  <div class="titles">
-    <h1>数绘湾区红脉<span class="dot">·</span>践行医者初心</h1>
-    <p>粤港澳大湾区红色文化资源 · 思政数字地图</p>
-  </div>
-</header>
-
-<!-- ============ 右上：控件 ============ -->
-<div class="hud hud--tools">
-  <button class="tool" id="btn-replay" title="重播开场">重播</button>
-  <button class="tool" id="btn-basemap" title="切换底图">卫星图</button>
-  <button class="tool" id="btn-panel" title="展开说明">说明</button>
-  <button class="tool" id="btn-full" title="全屏">全屏</button>
-</div>
-
-<!-- ============ 左下：面包屑 + 展开进度 ============ -->
-<div class="hud hud--nav">
-  <nav class="crumb" id="crumb" aria-label="层级导航"></nav>
-  <div class="progress" id="progress">
-    <div class="progress__row">
-      <span class="progress__label" id="pg-label">等待选择</span>
-      <span class="progress__count" id="pg-count"></span>
+  <!-- 载入动画 -->
+  <div id="boot" class="boot">
+    <div class="boot__seal">思政<br>地图</div>
+    <div class="boot__text">
+      <p class="boot__t1">数绘湾区红脉 <span>·</span> 践行医者初心</p>
+      <p class="boot__t2">正在加载国家标准版底图…</p>
     </div>
-    <div class="progress__track"><i id="pg-bar"></i></div>
-    <div class="progress__basis" id="pg-basis"></div>
+    <div class="boot__bar"><i></i></div>
   </div>
-</div>
 
-<!-- ============ 右下：南海诸岛附图 ============ -->
-<div id="inset" hidden></div>
+  <!-- 左上：标题 -->
+  <header class="hud hud--title" data-ui>
+    <div class="seal">思政<br>地图</div>
+    <div class="titles">
+      <h1>数绘湾区红脉<span class="dot">·</span>践行医者初心</h1>
+      <p>粤港澳大湾区红色文化资源 · 思政数字地图</p>
+    </div>
+  </header>
 
-<!-- ============ 右下：图例 ============ -->
-<div class="hud hud--legend" id="legend">
-  <div class="legend__title">图例</div>
-  <div class="legend__item"><i class="sw sw--core"></i>省府 / 市府</div>
-  <div class="legend__item"><i class="sw sw--region"></i>下辖行政区</div>
-  <div class="legend__item"><i class="sw sw--sea"></i>南海诸岛（十段线）</div>
-</div>
-
-<!-- ============ 底部提示 ============ -->
-<div class="hud hud--hint" id="hint">
-  <span class="hint__ico">◎</span>
-  <span id="hint-text">点击任意省份，逐级展开它的市、区县与乡镇</span>
-</div>
-
-<!-- ============ 右侧面板 ============ -->
-<aside class="panel" id="panel" aria-hidden="true">
-  <div class="panel__head">
-    <h2 id="panel-title">作品说明</h2>
-    <button class="panel__close" id="panel-close" aria-label="关闭">×</button>
+  <!-- 右上：控件 -->
+  <div class="hud hud--tools" data-ui>
+    <button class="tool" id="btn-hide" title="隐藏界面，便于查看地图（快捷键 H）">隐藏界面</button>
+    <button class="tool" id="btn-replay" title="重播开场">重播</button>
+    <button class="tool" id="btn-basemap" title="切换底图">卫星图</button>
+    <button class="tool" id="btn-panel" title="展开说明">说明</button>
+    <button class="tool" id="btn-full" title="全屏">全屏</button>
   </div>
-  <div class="panel__body" id="panel-body"></div>
-</aside>
 
-<!-- ============ 弹层：乡镇级提示 ============ -->
-<div class="toast" id="toast"></div>
+  <!-- 左下：面包屑 + 展开进度 -->
+  <div class="hud hud--nav" data-ui>
+    <nav class="crumb" id="crumb" aria-label="层级导航"></nav>
+    <div class="progress" id="progress">
+      <div class="progress__row">
+        <span class="progress__label" id="pg-label">等待选择</span>
+        <span class="progress__count" id="pg-count"></span>
+      </div>
+      <div class="progress__track"><i id="pg-bar"></i></div>
+      <div class="progress__basis" id="pg-basis"></div>
+    </div>
+  </div>
+
+  <!-- 右下：南海诸岛附图 -->
+  <div id="inset" data-ui hidden></div>
+
+  <!-- 右下：图例 -->
+  <div class="hud hud--legend" id="legend" data-ui>
+    <div class="legend__title">图例</div>
+    <div class="legend__item"><i class="sw sw--core"></i>省府 / 市府</div>
+    <div class="legend__item"><i class="sw sw--region"></i>下辖行政区</div>
+    <div class="legend__item"><i class="sw sw--sea"></i>南海诸岛（十段线）</div>
+  </div>
+
+  <!-- 底部提示 -->
+  <div class="hud hud--hint" id="hint" data-ui>
+    <span class="hint__ico">◎</span>
+    <span id="hint-text">点击任意省份，逐级展开它的市、区县与乡镇</span>
+  </div>
+
+  <!-- 右侧面板 -->
+  <aside class="panel" id="panel" aria-hidden="true">
+    <div class="panel__head">
+      <h2 id="panel-title">作品说明</h2>
+      <button class="panel__close" id="panel-close" aria-label="关闭">×</button>
+    </div>
+    <div class="panel__body" id="panel-body"></div>
+  </aside>
+
+  <!-- 弹层 -->
+  <div class="toast" id="toast"></div>
+
+  <!-- 隐藏界面后的恢复按钮（始终可点） -->
+  <button class="ui-restore" id="btn-show" title="显示界面（快捷键 H）">
+    <span class="ui-restore__ico">▤</span> 显示界面
+  </button>
+
+</div>
+
+<div id="diag" hidden></div>
 
 <script src="./config.js"></script>
 <script src="./data/gdp.js"></script>

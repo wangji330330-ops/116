@@ -35,15 +35,24 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 
-#map { position: absolute; inset: 0; }
+/* 全屏作用于 #app，建立独立层叠上下文，
+   确保 HUD 永远盖在 WebGL 画布之上 */
+#app {
+  position: absolute; inset: 0;
+  overflow: hidden;
+  isolation: isolate;
+  background: #0b1526;
+}
+#app:fullscreen,
+#app:-webkit-full-screen {
+  position: fixed; inset: 0;
+  width: 100%; height: 100%;
+  background: #0b1526;
+}
 
-/* 地图底纹：让高德底图更贴合宣纸质感 */
-#map::after {
-  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 2;
-  background:
-    radial-gradient(120% 90% at 50% 0%, rgba(255, 252, 245, .35), transparent 60%),
-    radial-gradient(120% 100% at 50% 100%, rgba(60, 30, 20, .12), transparent 55%);
-  mix-blend-mode: multiply;
+#map {
+  position: absolute; inset: 0;
+  z-index: 0;
 }
 
 .maplibregl-ctrl-attrib {
@@ -53,14 +62,15 @@ html, body {
 .maplibregl-ctrl-bottom-right { z-index: 5; }
 
 /* ================= 通用 HUD 面板 ================= */
+/* 刻意不使用 backdrop-filter：它每帧都要回读地图内容，
+   在低配机器上会造成明显掉帧 */
 .hud {
   position: absolute; z-index: 10;
-  background: rgba(253, 252, 249, .93);
-  backdrop-filter: blur(14px) saturate(1.4);
-  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  background: rgba(253, 252, 249, .96);
   border: 1px solid rgba(201, 162, 39, .30);
   border-radius: var(--r);
   box-shadow: var(--shadow);
+  transition: opacity .28s ease, transform .28s ease;
 }
 
 /* ================= 左上 · 标题 ================= */
@@ -213,7 +223,6 @@ html, body {
   transform-origin: 50% 50%;
   opacity: 0;
   transition: opacity .5s ease, transform .6s cubic-bezier(.16, 1.3, .35, 1);
-  will-change: opacity, transform;
 }
 .pin.is-on { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 .pin.is-dim { opacity: .26; }
@@ -377,9 +386,7 @@ body.lbl-compact .pin--prov .pin__name { font-size: 10.5px; }
   position: absolute; z-index: 30;
   top: 0; right: 0; height: 100%;
   width: min(430px, 92vw);
-  background: rgba(253, 252, 249, .97);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  background: #fdfcf9;
   border-left: 1px solid rgba(201, 162, 39, .32);
   box-shadow: -18px 0 50px rgba(28, 28, 30, .18);
   transform: translateX(102%);
@@ -462,19 +469,46 @@ body.lbl-compact .pin--prov .pin__name { font-size: 10.5px; }
 .toast.is-on { opacity: 1; transform: translate(-50%, 0); }
 .toast .t-hi { color: var(--gold-lite); font-weight: 700; }
 
+/* ================= 隐藏界面（沉浸看图） ================= */
+#app.ui-hidden [data-ui] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ui-restore {
+  position: absolute; z-index: 45;
+  top: max(14px, env(safe-area-inset-top)); right: 14px;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 14px;
+  font-family: var(--font); font-size: 12.5px; font-weight: 600;
+  color: var(--ink-2);
+  background: rgba(253, 252, 249, .96);
+  border: 1px solid rgba(201, 162, 39, .38);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  opacity: 0; visibility: hidden;
+  transform: translateY(-6px);
+  transition: opacity .25s ease, transform .25s ease, visibility .25s;
+}
+.ui-restore:hover { color: var(--red); border-color: rgba(200, 16, 46, .4); }
+.ui-restore__ico { font-size: 13px; line-height: 1; color: var(--gold); }
+#app.ui-hidden .ui-restore {
+  opacity: 1; visibility: visible; transform: none;
+}
+
 /* ================= 南海诸岛附图 ================= */
 #inset {
   position: absolute; z-index: 9;
   right: 16px; bottom: calc(max(16px, env(safe-area-inset-bottom)) + 128px);
   width: 158px;
-  background: rgba(253, 252, 249, .95);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(253, 252, 249, .96);
   border: 1px solid rgba(201, 162, 39, .42);
   border-radius: 10px;
   box-shadow: 0 4px 16px rgba(28, 28, 30, .16);
   overflow: hidden;
-  animation: fadeUp .8s ease .5s both;
+  /* 不用 animation：其 fill 模式会覆盖「隐藏界面」时的 opacity */
+  transition: opacity .28s ease, transform .28s ease;
 }
 @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 #inset[hidden] { display: none; }

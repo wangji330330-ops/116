@@ -63,6 +63,16 @@
     });
   }
 
+  /* 居中定位：四边等距留白，几何中心恰好落在屏幕正中 */
+  function centerOn(features, { padding = 90, maxZoom = 7.4, duration = 1400 } = {}) {
+    const b = bboxOf(features);
+    if (!isFinite(b[0])) return;
+    map.fitBounds([[b[0], b[1]], [b[2], b[3]]], {
+      padding: { top: padding, bottom: padding, left: padding, right: padding },
+      maxZoom, duration, pitch: 0, bearing: 0
+    });
+  }
+
   /* --------------------------- GDP 与排序 --------------------------- */
   function gdpOf(adcode, name, level) {
     if (level === 'province') return GDP.province[name] ?? null;
@@ -164,40 +174,56 @@
   let declutterTimer = null;
   function scheduleDeclutter() {
     clearTimeout(declutterTimer);
-    declutterTimer = setTimeout(declutter, 80);
+    declutterTimer = setTimeout(declutter, 90);
   }
 
   /* 国家版图相关省级单元：标签必定常驻，不受避让压制 */
   const ALWAYS_LABEL = new Set(['710000', '810000', '820000']);
 
+  /* 每个标签实测一次尺寸后缓存；切换紧凑模式时整体失效重测，
+     保证「先批量读、再批量写」，不产生读写交替造成的强制回流 */
+  function cachePinSize(p) {
+    if (p._w) return;
+    const card = p.el.querySelector('.pin__card');
+    if (!card) return;
+    const w = card.offsetWidth, h = card.offsetHeight;
+    if (w > 0 && h > 0) { p._w = w; p._h = h; }
+  }
+
+  function invalidateSizes() {
+    pins.forEach(p => { p._w = 0; p._h = 0; });
+  }
+
   function declutter() {
-    const boxes = [];
-    // 先按「省会优先 → GDP 降序」占位；台湾 / 香港 / 澳门 放最后，
-    // 即使冲突也强制显示，确保国家版图单元标签齐全
     const order = pins.slice().sort((a, b) => {
       const fa = ALWAYS_LABEL.has(String(a.row.adcode)) ? 1 : 0;
       const fb = ALWAYS_LABEL.has(String(b.row.adcode)) ? 1 : 0;
       return fa - fb;
     });
 
+    // —— 阶段一：全部读取（无写入） ——
+    order.forEach(p => { if (p.el.classList.contains('is-on')) cachePinSize(p); });
+
+    const boxes = [];
     const free = box => !boxes.some(b =>
       !(box.x + box.w < b.x - 4 || box.x > b.x + b.w + 4 ||
         box.y + box.h < b.y - 3 || box.y > b.y + b.h + 3));
 
+    const fallback = document.body.classList.contains('lbl-compact')
+      ? { w: 64, h: 20 } : { w: 86, h: 34 };
+
+    // —— 阶段二：全部写入 ——
     order.forEach(p => {
       if (!p.el.classList.contains('is-on')) return;
       if (p.el.classList.contains('is-dim')) return;
-      const card = p.el.querySelector('.pin__card');
-      if (!card) return;
       if (!p.lngLat) return;
 
-      // 用地图投影取屏幕坐标，避免 Marker transform 尚未刷新导致误判
       const pt = map.project(p.lngLat);
       if (!pt || !isFinite(pt.x)) return;
 
-      const w = card.offsetWidth || 78;
-      const h = card.offsetHeight || 32;
       const forced = ALWAYS_LABEL.has(String(p.row.adcode));
+      const w = p._w || fallback.w;
+      const h = p._h || fallback.h;
       const cx = pt.x, cy = pt.y;
 
       const below = { x: cx - w / 2, y: cy + 5, w, h };
@@ -232,6 +258,7 @@
     if (compact === compactMode) return;
     compactMode = compact;
     document.body.classList.toggle('lbl-compact', compact);
+    invalidateSizes();          // 紧凑模式改变标签尺寸，需重测
     scheduleDeclutter();
   }
 
@@ -252,9 +279,20 @@
   }
 
   function selectProvince(id) {
-    if (selProvId) setState('prov', selProvId, { selected: false });
+    if (selProvId) setState('prov', selProvId, { selected: false, dim: false });
     selProvId = id ? String(id) : null;
-    if (selProvId) setState('prov', selProvId, { selected: true });
+
+    if (selProvId && countryFC) {
+      // 只突出选中的省份，其余全部淡化
+      countryFC.features.forEach(f => {
+        const ad = String(f.properties.adcode);
+        if (ad === selProvId) setState('prov', ad, { selected: true, dim: false });
+        else setState('prov', ad, { selected: false, dim: true });
+      });
+    } else if (countryFC) {
+      countryFC.features.forEach(f => setState('prov', String(f.properties.adcode), { dim: false, selected: false }));
+    }
+
     pins.forEach(p => {
       if (p.row.level === 'province' || p.el.classList.contains('pin--prov')) {
         p.el.classList.toggle('is-dim', !!selProvId && String(p.row.adcode) !== selProvId);
@@ -372,8 +410,9 @@
     current.region = f;
 
     selectProvince(f.properties.adcode);
-    fitFeature([f], { maxZoom: 7.4, padding: 30 });
-    await sleep(560);
+    // 四边等距 → 该省几何中心落在屏幕正中
+    centerOn([f], { maxZoom: 7.4, padding: 80 });
+    await sleep(760);
     await openRegion(f);
   }
 
@@ -602,8 +641,17 @@
   }
 
   /* ============================ 开场 ============================ */
+  /* 球面投影只用于开场「地球 → 中国」的镜头运动。
+     实测球面渲染开销约为平面投影的 2 倍，落地后切回平面，
+     既保留地球观感，又让后续下钻交互更流畅 */
+  function setProjection(kind) {
+    if (typeof map.setProjection !== 'function') return;
+    try { map.setProjection({ type: kind }); } catch (_) {}
+  }
+
   async function intro() {
     els.boot.classList.add('is-gone');
+    setProjection('globe');
     map.jumpTo({ center: [101, 16], zoom: 1.35, pitch: 0, bearing: 0 });
     await sleep(900);
     map.flyTo({ center: [104.6, 33], zoom: 3.8, duration: 4300, curve: 1.28, essential: true });
@@ -612,6 +660,7 @@
       map.once('moveend', done);
       setTimeout(done, 5200);
     });
+    setProjection('mercator');   // 落地后转平面，换取交互流畅度
     await resetToChina();
     toast('已载入 <b class="t-hi">国家标准版中国地图</b> · 点击任一省份开始逐级展开。', 4200);
     autoDrill();
@@ -800,32 +849,96 @@
     els.panelBody.scrollTop = 0;
   }
 
+  /* ============================ 底图切换 ============================ */
+  /* auto：球面阶段用卫星影像，落地后自动切标准图（高德标准图 z<3 为空白） */
+  let baseMode = 'auto';
+  let baseApplied = null;
+
+  function applyBasemap(force) {
+    if (!map.getLayer('sat')) return;
+    const z = map.getZoom();
+    let sat;
+    if (baseMode === 'sat') sat = true;
+    else if (baseMode === 'vec') sat = false;
+    else sat = z < 3.15;
+
+    const key = String(sat);
+    if (!force && key === baseApplied) return;
+    baseApplied = key;
+
+    map.setLayoutProperty('sat', 'visibility', sat ? 'visible' : 'none');
+    map.setLayoutProperty('vec', 'visibility', sat ? 'none' : 'visible');
+  }
+
   /* ============================ UI 绑定 ============================ */
   function bindUI() {
-    $('btn-replay').onclick = () => { resetToChina({ animate: false }).then(intro); };
-    $('btn-full').onclick = () => {
-      if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
-      else document.exitFullscreen?.();
+    const app = document.getElementById('app');
+
+    /* —— 隐藏 / 显示界面 —— */
+    function setUIHidden(hide) {
+      app.classList.toggle('ui-hidden', hide);
+      try { localStorage.setItem('sz-ui-hidden', hide ? '1' : '0'); } catch (_) {}
+      if (hide) closePanel();
+    }
+    const btnHide = document.getElementById('btn-hide');
+    const btnShow = document.getElementById('btn-show');
+    if (btnHide) btnHide.onclick = () => setUIHidden(true);
+    if (btnShow) btnShow.onclick = () => setUIHidden(false);
+    try { if (localStorage.getItem('sz-ui-hidden') === '1') setUIHidden(true); } catch (_) {}
+
+    /* —— 全屏：作用于 #app，保证界面控件一并进入全屏 —— */
+    const btnFull = document.getElementById('btn-full');
+    if (btnFull) {
+      btnFull.onclick = async () => {
+        try {
+          if (document.fullscreenElement) {
+            await document.exitFullscreen();
+          } else if (app.requestFullscreen) {
+            await app.requestFullscreen();
+          } else if (app.webkitRequestFullscreen) {
+            app.webkitRequestFullscreen();
+          } else {
+            toast('当前浏览器不支持全屏，可按 <b class="t-hi">F11</b> 进入浏览器全屏。');
+          }
+        } catch (e) {
+          toast('全屏被浏览器拦截，可按 <b class="t-hi">F11</b> 进入浏览器全屏。');
+        }
+      };
+    }
+    document.addEventListener('fullscreenchange', () => {
+      const on = !!document.fullscreenElement;
+      btnFull && (btnFull.textContent = on ? '退出全屏' : '全屏');
+      // 全屏改变可视区域，必须让地图重新计算尺寸
+      requestAnimationFrame(() => { map.resize(); scheduleDeclutter(); });
+      setTimeout(() => { map.resize(); scheduleDeclutter(); }, 260);
+    });
+
+    document.getElementById('btn-replay').onclick = () => { resetToChina({ animate: false }).then(intro); };
+    document.getElementById('btn-basemap').onclick = ev => {
+      baseMode = baseMode === 'vec' ? 'sat' : 'vec';
+      ev.currentTarget.classList.toggle('is-on', baseMode === 'sat');
+      ev.currentTarget.textContent = baseMode === 'sat' ? '标准图' : '卫星图';
+      applyBasemap(true);
     };
-    $('btn-basemap').onclick = ev => {
-      const on = ev.currentTarget.classList.toggle('is-on');
-      ev.currentTarget.textContent = on ? '标准图' : '卫星图';
-      map.setPaintProperty('sat', 'raster-opacity', on ? 1 : 0);
-      map.setPaintProperty('vec', 'raster-opacity', on ? 0 : 1);
-    };
-    $('btn-panel').onclick = openPanel;
-    $('panel-close').onclick = () => {
-      els.panel.classList.remove('is-open');
-      els.panel.setAttribute('aria-hidden', 'true');
-    };
+    document.getElementById('btn-panel').onclick = openPanel;
+    document.getElementById('panel-close').onclick = closePanel;
+
     window.addEventListener('keydown', ev => {
       if (ev.key === 'Escape') {
-        if (els.panel.classList.contains('is-open')) {
-          els.panel.classList.remove('is-open');
-        } else backOne();
+        if (els.panel.classList.contains('is-open')) closePanel();
+        else if (app.classList.contains('ui-hidden')) setUIHidden(false);
+        else backOne();
+      }
+      if ((ev.key === 'h' || ev.key === 'H') && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
+        setUIHidden(!app.classList.contains('ui-hidden'));
       }
       if (ev.key === 'Backspace' && current.level > 0) { ev.preventDefault(); backOne(); }
     });
+  }
+
+  function closePanel() {
+    els.panel.classList.remove('is-open');
+    els.panel.setAttribute('aria-hidden', 'true');
   }
 
   /* ============================ 图层 ============================ */
@@ -852,22 +965,28 @@
           ['boolean', ['feature-state', 'selected'], false], RED,
           ['boolean', ['feature-state', 'hover'], false], '#e8576b',
           RED],
-        /* 放大后减弱整省底色，避免压住底图；选中态仍明显强于未选中 */
+        /* 未选中的省份淡化，只留极浅底色 */
         'fill-opacity': ['case',
+          ['boolean', ['feature-state', 'dim'], false], 0.012,
           ['boolean', ['feature-state', 'selected'], false],
-            ['interpolate', ['linear'], ['zoom'], 4, 0.30, 6.5, 0.16, 9, 0.07],
-          ['boolean', ['feature-state', 'hover'], false], 0.14,
+            ['interpolate', ['linear'], ['zoom'], 4, 0.28, 6.5, 0.15, 9, 0.06],
+          ['boolean', ['feature-state', 'hover'], false], 0.16,
           ['interpolate', ['linear'], ['zoom'], 4, 0.07, 7, 0.03]]
       }
     });
     map.addLayer({
       id: 'prov-line', type: 'line', source: 'prov', filter: provF,
       paint: {
-        'line-color': ['case', ['boolean', ['feature-state', 'selected'], false], RED_DEEP, '#a83a48'],
+        'line-color': ['case',
+          ['boolean', ['feature-state', 'dim'], false], '#b6b1a6',
+          ['boolean', ['feature-state', 'selected'], false], RED_DEEP,
+          '#a83a48'],
         'line-width': ['case',
+          ['boolean', ['feature-state', 'dim'], false], 0.5,
           ['boolean', ['feature-state', 'selected'], false], 2.8,
           ['boolean', ['feature-state', 'hover'], false], 1.6, 0.85],
         'line-opacity': ['case',
+          ['boolean', ['feature-state', 'dim'], false], 0.20,
           ['boolean', ['feature-state', 'selected'], false], 1,
           ['boolean', ['feature-state', 'hover'], false], 0.9, 0.55]
       }
@@ -929,8 +1048,9 @@
       if (f) drillInto({ f });
     });
 
-    map.on('moveend', () => { updateLabelMode(); scheduleDeclutter(); });
-    map.on('zoom', () => updateLabelMode());
+    map.on('moveend', () => { applyBasemap(); updateLabelMode(); scheduleDeclutter(); });
+    map.on('zoom', () => { applyBasemap(); updateLabelMode(); });
+    map.on('resize', () => scheduleDeclutter());
   }
 
   /* ============================ 启动 ============================ */
@@ -950,18 +1070,14 @@
         },
         layers: [
           { id: 'bg', type: 'background', paint: { 'background-color': '#0a1322' } },
-          /* 高德标准图在 z<3 为空白瓦片；球面投影下缩放值与瓦片层级不同，
-             故在 2.9~3.3 之间由卫星影像过渡到标准地图 */
+          /* 高德标准图在 z<3 为空白瓦片；卫星图仅用于地球阶段。
+             两图层靠 visibility 切换，避免同时拉取两套瓦片。
+             raster-fade-duration 设为 0：省去新旧瓦片逐帧混合的开销 */
           { id: 'sat', type: 'raster', source: 'sat',
-            paint: {
-              'raster-opacity': ['interpolate', ['linear'], ['zoom'], 2.9, 1, 3.3, 0],
-              'raster-saturation': -0.05
-            } },
+            paint: { 'raster-opacity': 1, 'raster-fade-duration': 0 } },
           { id: 'vec', type: 'raster', source: 'vec',
-            paint: {
-              'raster-opacity': ['interpolate', ['linear'], ['zoom'], 2.9, 0, 3.3, 1],
-              'raster-saturation': -0.18
-            } }
+            layout: { visibility: 'none' },
+            paint: { 'raster-opacity': 1, 'raster-fade-duration': 0 } }
         ]
       },
       center: [104.6, 33],
@@ -975,7 +1091,8 @@
       minZoom: 0.4,
       maxZoom: 16,
       renderWorldCopies: false,
-      antialias: true,
+      antialias: false,
+      /* 关闭混合与动态重绘，降低低配机器的 GPU 压力 */
       attributionControl: { compact: true }
     });
 
@@ -1005,6 +1122,7 @@
       }
 
       addOverlayLayers();
+      applyBasemap(true);
       bindMapEvents();
       buildInset();
       bindUI();
