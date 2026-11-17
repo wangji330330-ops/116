@@ -59,6 +59,7 @@
   function fitFeature(features, { padding = 50, maxZoom = 11, duration = 1400 } = {}) {
     const b = bboxOf(features);
     if (!isFinite(b[0])) return;
+    map.stop();                       // 打断上一次镜头，避免连点导致乱跳
     map.fitBounds([[b[0], b[1]], [b[2], b[3]]], {
       padding: { top: 150, bottom: 170, left: padding + 40, right: padding + 40 },
       maxZoom, duration, pitch: 0, bearing: 0
@@ -69,10 +70,33 @@
   function centerOn(features, { padding = 90, maxZoom = 7.4, duration = 1400 } = {}) {
     const b = bboxOf(features);
     if (!isFinite(b[0])) return;
+    map.stop();
     map.fitBounds([[b[0], b[1]], [b[2], b[3]]], {
       padding: { top: padding, bottom: padding, left: padding, right: padding },
       maxZoom, duration, pitch: 0, bearing: 0
     });
+  }
+
+  /* 点哪儿放大到哪儿：以点击点为锚，按区块大小给出合适层级，不乱跳 */
+  function zoomToRegion(feature, clickedLngLat, { maxZoom = 11.2, duration = 760 } = {}) {
+    const b = bboxOf([feature]);
+    if (!isFinite(b[0])) return;
+    const nw = map.project([b[0], b[3]]);
+    const se = map.project([b[2], b[1]]);
+    const w = Math.abs(se.x - nw.x), h = Math.abs(se.y - nw.y);
+    const vw = window.innerWidth, vh = window.innerHeight;
+
+    // 目标层级：让该区块约占视口 78%，但不超过 maxZoom
+    let scale = 1;
+    if (w > 0 && h > 0) scale = Math.min((vw * 0.78) / w, (vh * 0.78) / h);
+    const target = Math.min(maxZoom, map.getZoom() + Math.log2(Math.max(1.01, scale)));
+
+    const center = clickedLngLat && map.getBounds().contains(clickedLngLat)
+      ? clickedLngLat
+      : (() => { const c = centerOf(feature); return { lng: c[0], lat: c[1] }; })();
+
+    map.stop();
+    map.easeTo({ center, zoom: target, pitch: 0, bearing: 0, duration });
   }
 
   /* --------------------------- GDP 与排序 --------------------------- */
@@ -212,13 +236,13 @@
 
   function declutter() {
     // 当前层级优先级最高，上一层兄弟标记最先被挤掉；港澳台始终保留
-    /* 优先级：港澳台常显 → 市/区县层级的场馆名 → 当前层级行政区 → 上一级 → 省级时的场馆 */
+    /* 优先级：行政区名称一律常显（不挤没）→ 场馆/聚合点按空间避让 */
     const rankOf = (p) => {
       if (ALWAYS_LABEL.has(String(p.row.adcode))) return 0;
-      const isVenue = p.row.level === 'venue';
-      if (isVenue) return current.level >= 2 ? 1 : 4;
-      if (parentPins.includes(p)) return 3;
-      return 2;
+      const lvl = p.row.level;
+      if (lvl === 'venue' || lvl === 'cluster') return 3;
+      if (parentPins.includes(p)) return 2;
+      return 1;
     };
     const order = pins.concat(parentPins).concat(venuePins).sort((a, b) => rankOf(a) - rankOf(b));
 
@@ -242,7 +266,8 @@
       const pt = map.project(p.lngLat);
       if (!pt || !isFinite(pt.x)) return;
 
-      const forced = ALWAYS_LABEL.has(String(p.row.adcode));
+      const forced = ALWAYS_LABEL.has(String(p.row.adcode)) ||
+        (p.row.level !== 'venue' && p.row.level !== 'cluster' && !parentPins.includes(p));
       const w = p._w || fallback.w;
       const h = p._h || fallback.h;
       const cx = pt.x, cy = pt.y;
@@ -405,16 +430,7 @@
       if (b) b.onclick = () => { hideSpot(); openTownship(feature); };
     }
 
-    // 定位：优先放在点击点右侧，越界则翻到左侧 / 上方
-    const W = 300, H = 190;
-    const vw = window.innerWidth, vh = window.innerHeight;
-    let x = point ? point.x + 16 : (vw - W) / 2;
-    let y = point ? point.y + 14 : (vh - H) / 2;
-    if (x + W > vw - 12) x = Math.max(12, (point ? point.x : vw / 2) - W - 16);
-    if (y + H > vh - 12) y = Math.max(12, (point ? point.y : vh / 2) - H - 14);
-
-    spotEl.style.left = x + 'px';
-    spotEl.style.top = y + 'px';
+    // 定位交给 CSS：固定贴右侧中部，不压住地图中心
     spotEl.hidden = false;
     requestAnimationFrame(() => spotEl.classList.add('is-on'));
   }
@@ -694,7 +710,7 @@
     return opening;
   }
 
-  async function drillInto(row) {
+  async function drillInto(row, clickedLngLat) {
     const f = featOf(row);
     const p = propsOf(f);
 
@@ -729,7 +745,7 @@
         setContext(provKids);
       }
 
-      fitFeature([f], { maxZoom: 11, padding: 120, duration: 780 });
+      zoomToRegion(f, clickedLngLat, { maxZoom: 11.4, duration: 720 });
       updateCrumb();
       els.pgLabel.textContent = `${p.name} · 县级行政区`;
       els.pgCount.textContent = '';
@@ -743,7 +759,7 @@
 
     // 市 → 区县：先出图形和标签，镜头同时飞过去
     const opening = openRegion(f);
-    fitFeature([f], { maxZoom: 10.8, padding: 30, duration: 850 });
+    zoomToRegion(f, clickedLngLat, { maxZoom: 10.8, duration: 780 });
     return opening;
   }
 
@@ -1267,7 +1283,7 @@
     // 平时锁死俯仰，进入 3D 时才临时放开
     try { map.setMaxPitch(70); } catch (_) {}
     map.easeTo({ pitch: 46, bearing: -14, duration: 1200 });
-    toast('广东 <b class="t-hi">立体浮雕</b>：起伏高度 = 该市收录的红色场馆数量（轻微起伏，不遮挡底图）', 4600);
+    toast('广东 <b class="t-hi">立体浮雕</b>：起伏高度对应各市收录的红色场馆数量', 4600);
   }
 
   /* ============================ 红色场馆点位 ============================ */
@@ -1325,9 +1341,73 @@
     clearVenues();
     const list = sitesForView().filter(v => isFinite(v.lng) && isFinite(v.lat));
     if (!list.length) { scheduleDeclutter(); return; }
-    list.forEach(v => venuePins.push(makeVenuePin(v)));
-    venuePins.forEach((p, i) => setTimeout(() => p.el.classList.add('is-on'), 60 + i * 26));
-    setTimeout(scheduleDeclutter, 60 + list.length * 26 + 120);
+
+    /* 就近聚合：屏幕上靠得很近的场馆合并成一个「N 处」气泡，点开再散开，
+       避免老城区几十个点糊成一团 */
+    const R = 46;
+    const pts = list.map(v => ({
+      v,
+      p: map.project([v.lng, v.lat])
+    })).filter(o => isFinite(o.p.x) && isFinite(o.p.y));
+
+    const used = new Set();
+    const groups = [];
+    pts.forEach((o, i) => {
+      if (used.has(i)) return;
+      const g = [o.v];
+      used.add(i);
+      pts.forEach((q, j) => {
+        if (used.has(j) || i === j) return;
+        if (Math.hypot(o.p.x - q.p.x, o.p.y - q.p.y) < R) { g.push(q.v); used.add(j); }
+      });
+      groups.push(g);
+    });
+
+    groups.forEach(g => {
+      if (g.length === 1) {
+        venuePins.push(makeVenuePin(g[0]));
+      } else {
+        venuePins.push(makeClusterPin(g));
+      }
+    });
+
+    venuePins.forEach((p, i) => setTimeout(() => p.el.classList.add('is-on'), 50 + i * 24));
+    setTimeout(scheduleDeclutter, 60 + venuePins.length * 24 + 140);
+  }
+
+  /* 缩放后重新聚合（节流，避免频繁重建 DOM） */
+  let venueZoomTimer = null;
+  function scheduleVenueZoom() {
+    if (!VENUES.length) return;
+    clearTimeout(venueZoomTimer);
+    venueZoomTimer = setTimeout(() => {
+      if (current.level >= 1) updateVenues();
+    }, 260);
+  }
+
+  function makeClusterPin(items) {
+    const wrap = document.createElement('div');
+    wrap.className = 'pinwrap';
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'pin pin--cluster';
+    el.setAttribute('aria-label', `${items.length} 处红色场馆`);
+    el.innerHTML = `<span class="pin__dot">${items.length}</span>` +
+      `<span class="pin__card"><span class="pin__name">${items.length} 处红色场馆</span></span>`;
+
+    const lng = items.reduce((s, v) => s + v.lng, 0) / items.length;
+    const lat = items.reduce((s, v) => s + v.lat, 0) / items.length;
+
+    el.addEventListener('click', ev => {
+      ev.stopPropagation();
+      // 点气泡：放大到这一簇
+      map.easeTo({ center: [lng, lat], zoom: Math.min(15, map.getZoom() + 2), duration: 600 });
+    });
+
+    wrap.appendChild(el);
+    new maplibregl.Marker({ element: wrap, anchor: 'center' }).setLngLat([lng, lat]).addTo(map);
+    return { row: { adcode: 'c_' + lng + '_' + lat, name: `${items.length} 处场馆`, level: 'cluster' },
+             el, wrap, lngLat: [lng, lat], cluster: items };
   }
 
   function showVenueCard(v, point) {
@@ -1339,13 +1419,6 @@
       <div class="spot__hint">拖动地图可继续浏览，卡片会自动收起</div>`;
 
     const W = 300, H = 170;
-    const vw = window.innerWidth, vh = window.innerHeight;
-    let x = (point ? point.x : vw / 2) + 16;
-    let y = (point ? point.y : vh / 2) + 14;
-    if (x + W > vw - 12) x = Math.max(12, (point ? point.x : vw / 2) - W - 16);
-    if (y + H > vh - 12) y = Math.max(12, (point ? point.y : vh / 2) - H - 14);
-    spotEl.style.left = x + 'px';
-    spotEl.style.top = y + 'px';
     spotEl.hidden = false;
     requestAnimationFrame(() => spotEl.classList.add('is-on'));
   }
@@ -1506,16 +1579,6 @@
         点开其他省份时仅显示行政区划，不含场馆数据。
       </div>
 
-      <h3>交互创意</h3>
-      <ul>
-        <li><strong>地球开场</strong>：卫星地球自动飞入中国疆域；</li>
-        <li><strong>逐级高亮</strong>：点选省份即整幅高亮，其余省份淡出；</li>
-        <li><strong>省会领跑</strong>：每级先展开省会 / 市政府所在地，其余依次淡入；</li>
-        <li><strong>跨级可点</strong>：上一层级的标记、同级的市与区县都常驻可点，随时跳到任意层级；</li>
-        <li><strong>红色资源检索</strong>：右上角 ⌕ 展开搜索框，输入场馆名或地名即可直达；说明面板按「省 › 市 › 区县 › 乡镇」分层列出。</li>
-        <li><strong>场馆点位</strong>：进入市 / 区县时，该地的红色场馆以金色点位落在实际地址上，点击可看名称与详细地址。</li>
-      </ul>
-
       <h3>核心机制</h3>
       <table>
         <tr><th>层级</th><th>展开规则</th></tr>
@@ -1529,13 +1592,20 @@
         仅用于决定出现次序，界面上不显示数值。
       </p>
 
-      <h3>数据来源</h3>
+      <h3>创作团队</h3>
+      <p>广州卫生职业技术学院　2025 级针灸推拿专业</p>
+      <p>伍晟楠　王术清　刘嘉韡　林熹桐　马晟焘　曾庆均</p>
+      <p style="font-size:11px;color:#86868b">（按姓氏笔画排名）</p>
+
+      <h3>数据与资源致谢</h3>
+      <p>本作品使用了以下公开网络资源，谨致谢意：</p>
       <table>
-        <tr><th>用途</th><th>来源</th></tr>
-        <tr><td>底图</td><td>高德地图（标准图 / 卫星图）</td></tr>
-        <tr><td>行政界线</td><td>阿里云 DataV.GeoAtlas</td></tr>
-        <tr><td>展开次序</td><td>${GDP.year} 年 GDP 公开统计口径整理值</td></tr>
-        <tr><td>场馆名录</td><td>《广东革命文化与红色记忆场馆名录》</td></tr>
+        <tr><th>资源</th><th>提供方</th><th>用途</th></tr>
+        <tr><td>高德地图瓦片服务</td><td>高德开放平台（lbs.amap.com）</td><td>标准底图与卫星影像</td></tr>
+        <tr><td>高德地理编码服务</td><td>高德开放平台</td><td>64 处场馆经纬度解析</td></tr>
+        <tr><td>DataV.GeoAtlas 行政区划</td><td>阿里云计算有限公司</td><td>全国省 / 市 / 区县行政界线</td></tr>
+        <tr><td>MapLibre GL JS</td><td>MapLibre 开源社区</td><td>地图渲染引擎</td></tr>
+        <tr><td>广东革命文化与红色记忆场馆名录</td><td>课程教学方案附件二</td><td>场馆名称与地址</td></tr>
       </table>
 
       <div class="note">
@@ -1812,7 +1882,7 @@
     map.on('mouseout', () => { hideTip(); map.getCanvas().style.cursor = ''; });
 
     /* —— 点击：无论当前在哪一级，点谁就进入谁 —— */
-    function enterAt(f, point) {
+    function enterAt(f, point, lngLat) {
       if (!f) return;
       const p = f.properties || {};
 
@@ -1821,11 +1891,17 @@
         if (current.province && String(p.adcode) === String(current.province.properties.adcode)) return;
         return drillProvince({ f });
       }
-      if (p.level === 'city') return drillInto({ f });
+      if (p.level === 'city') return drillInto({ f }, lngLat);
 
       // 区县 / 乡镇：进入该区域并显示所属
-      return drillInto({ f });
+      return drillInto({ f }, lngLat);
     }
+
+    /* —— 点击：无论当前在哪一级，点谁就进入谁（自绘几何判定，稳定命中） —— */
+    map.on('click', e => {
+      const f = hitTest(e.lngLat);
+      if (f) enterAt(f, e.point, e.lngLat);
+    });
 
     /* —— 点击：无论当前在哪一级，点谁就进入谁（自绘几何判定，稳定命中） —— */
     map.on('click', e => {
@@ -1849,9 +1925,9 @@
       }
     });
 
-    map.on('moveend', () => { applyBasemap(); updateLabelMode(); scheduleDeclutter(); updateRedFocus(); });
+    map.on('moveend', () => { applyBasemap(); updateLabelMode(); scheduleDeclutter(); updateRedFocus(); scheduleVenueZoom(); });
     map.on('zoom', () => { applyBasemap(); updateLabelMode(); });
-    map.on('resize', () => { scheduleDeclutter(); updateRedFocus(); });
+    map.on('resize', () => { scheduleDeclutter(); updateRedFocus(); scheduleVenueZoom(); });
   }
 
   /* ============================ 启动 ============================ */
