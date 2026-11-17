@@ -290,6 +290,20 @@ html, body {
 .pin--core .pin__card { opacity: 1; transform: translate(-50%, 0) scale(1); }
 .pin--core .pin__name { color: var(--red-deep); }
 
+/* 红色场馆点位：金色小点，区别于行政区标记 */
+.pin--venue { z-index: 2; }
+.pin--venue .pin__dot {
+  width: 9px; height: 9px; border: 1.5px solid #fff;
+  background: var(--gold);
+  box-shadow: 0 1px 5px rgba(140, 100, 10, .55);
+}
+.pin--venue:hover .pin__dot { background: var(--red); transform: scale(1.35); }
+.pin--venue .pin__card {
+  background: rgba(255, 252, 244, .97);
+  border-color: rgba(201, 162, 39, .55);
+}
+.pin--venue .pin__name { font-size: 10px; color: #7a5c00; }
+
 /* 层级优先：上一层兄弟标记沉到下面，不遮挡当前层级 */
 .pin--ctx {
   z-index: -1;

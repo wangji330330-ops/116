@@ -212,9 +212,15 @@
 
   function declutter() {
     // 当前层级优先级最高，上一层兄弟标记最先被挤掉；港澳台始终保留
-    const rankOf = (p) => ALWAYS_LABEL.has(String(p.row.adcode)) ? 0
-      : (parentPins.includes(p) ? 2 : 1);
-    const order = pins.concat(parentPins).sort((a, b) => rankOf(a) - rankOf(b));
+    /* 优先级：港澳台常显 → 市/区县层级的场馆名 → 当前层级行政区 → 上一级 → 省级时的场馆 */
+    const rankOf = (p) => {
+      if (ALWAYS_LABEL.has(String(p.row.adcode))) return 0;
+      const isVenue = p.row.level === 'venue';
+      if (isVenue) return current.level >= 2 ? 1 : 4;
+      if (parentPins.includes(p)) return 3;
+      return 2;
+    };
+    const order = pins.concat(parentPins).concat(venuePins).sort((a, b) => rankOf(a) - rankOf(b));
 
     // —— 阶段一：全部读取（无写入） ——
     order.forEach(p => { if (p.el.classList.contains('is-on')) cachePinSize(p); });
@@ -636,6 +642,7 @@
       els.pgLabel.textContent = `已展开 ${rows.length} 个${kind === 'city' ? '市 / 州' : '区 / 县'}`;
       els.pgBasis.textContent = basis + ' · 点击任一区域继续下钻';
       schedulePrefetch(rows);
+      updateVenues();
       updateRedFocus();
     }
   }
@@ -729,6 +736,8 @@
       els.pgBar.style.width = '100%';
       els.pgBasis.textContent = '点击周边区县或任意城市可直接切换 · 拖动地图浏览';
       showSpot(p, null, f);
+      updateVenues();
+      updateRedFocus();
       return;
     }
 
@@ -896,6 +905,7 @@
   async function resetToChina({ animate = true } = {}) {
     const my = ++runToken;
     clearAllPins();
+    clearVenues();
     setDetail([]);
     setFocus([]);
     setContext([]);
@@ -1260,6 +1270,86 @@
     toast('广东 <b class="t-hi">立体浮雕</b>：起伏高度 = 该市收录的红色场馆数量（轻微起伏，不遮挡底图）', 4600);
   }
 
+  /* ============================ 红色场馆点位 ============================ */
+  /* 数据来自 data/red-sites.geo.json（由 tools/geocode-red-sites.mjs 用高德地理编码生成，
+     与高德底图同为 GCJ-02，可直接对齐）。没有坐标的场馆不出点，避免假点位。 */
+  let VENUES = [];
+  let venuePins = [];
+
+  function clearVenues() {
+    venuePins.forEach(p => p.wrap.remove());
+    venuePins = [];
+  }
+
+  function sitesForView() {
+    if (!VENUES.length) return [];
+    const lvl = current.level;
+    if (lvl >= 3 && current.region) {
+      const ad = String(current.region.properties.adcode);
+      const byD = VENUES.filter(v => String(v.districtAdcode) === ad);
+      if (byD.length) return byD;
+      const cityAd = current.city ? String(current.city.properties.adcode) : null;
+      return VENUES.filter(v => String(v.cityAdcode) === cityAd);
+    }
+    if (lvl === 2 && current.city) {
+      const ad = String(current.city.properties.adcode);
+      return VENUES.filter(v => String(v.cityAdcode) === ad);
+    }
+    if (lvl === 1) return VENUES;          // 广东省：全省场馆
+    return [];
+  }
+
+  function makeVenuePin(v) {
+    const wrap = document.createElement('div');
+    wrap.className = 'pinwrap';
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'pin pin--venue';
+    el.setAttribute('aria-label', v.name);
+    el.innerHTML =
+      '<span class="pin__ring"></span><span class="pin__dot"></span>' +
+      '<span class="pin__card"><span class="pin__name"></span></span>';
+    el.querySelector('.pin__name').textContent = v.name;
+    el.addEventListener('click', ev => {
+      ev.stopPropagation();
+      showVenueCard(v, map.project([v.lng, v.lat]));
+    });
+
+    const lngLat = [v.lng, v.lat];
+    wrap.appendChild(el);
+    new maplibregl.Marker({ element: wrap, anchor: 'center' }).setLngLat(lngLat).addTo(map);
+    return { row: { adcode: 'v_' + v.name, name: v.name, level: 'venue' }, el, wrap, lngLat, venue: v };
+  }
+
+  function updateVenues() {
+    clearVenues();
+    const list = sitesForView().filter(v => isFinite(v.lng) && isFinite(v.lat));
+    if (!list.length) { scheduleDeclutter(); return; }
+    list.forEach(v => venuePins.push(makeVenuePin(v)));
+    venuePins.forEach((p, i) => setTimeout(() => p.el.classList.add('is-on'), 60 + i * 26));
+    setTimeout(scheduleDeclutter, 60 + list.length * 26 + 120);
+  }
+
+  function showVenueCard(v, point) {
+    spotBody.innerHTML = `
+      <p class="spot__name">${esc(v.name)}</p>
+      <p class="spot__path">${esc(v.city || '')}${v.district ? ' › ' + esc(v.district) : ''}${v.town ? ' › ' + esc(v.town) : ''}</p>
+      <div class="spot__row"><span>地址</span><b>${esc(v.addr)}</b></div>
+      <div class="spot__row"><span>类别</span><b>红色场馆</b></div>
+      <div class="spot__hint">拖动地图可继续浏览，卡片会自动收起</div>`;
+
+    const W = 300, H = 170;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    let x = (point ? point.x : vw / 2) + 16;
+    let y = (point ? point.y : vh / 2) + 14;
+    if (x + W > vw - 12) x = Math.max(12, (point ? point.x : vw / 2) - W - 16);
+    if (y + H > vh - 12) y = Math.max(12, (point ? point.y : vh / 2) - H - 14);
+    spotEl.style.left = x + 'px';
+    spotEl.style.top = y + 'px';
+    spotEl.hidden = false;
+    requestAnimationFrame(() => spotEl.classList.add('is-on'));
+  }
+
   /* ============================ 红色传承：铺满屏幕即显示 ============================ */
   /* 当某个行政区在屏幕上占的面积达到视口 75% 时，显示该地的红色场馆；
      高亮只画它自己的地块，不会溢到别的市 / 区去 */
@@ -1422,7 +1512,8 @@
         <li><strong>逐级高亮</strong>：点选省份即整幅高亮，其余省份淡出；</li>
         <li><strong>省会领跑</strong>：每级先展开省会 / 市政府所在地，其余依次淡入；</li>
         <li><strong>跨级可点</strong>：上一层级的标记、同级的市与区县都常驻可点，随时跳到任意层级；</li>
-        <li><strong>红色资源检索</strong>：左上角搜索框可直达任意场馆，说明面板按「省 › 市 › 区县 › 乡镇」分层列出。</li>
+        <li><strong>红色资源检索</strong>：右上角 ⌕ 展开搜索框，输入场馆名或地名即可直达；说明面板按「省 › 市 › 区县 › 乡镇」分层列出。</li>
+        <li><strong>场馆点位</strong>：进入市 / 区县时，该地的红色场馆以金色点位落在实际地址上，点击可看名称与详细地址。</li>
       </ul>
 
       <h3>核心机制</h3>
@@ -1852,6 +1943,12 @@
           s.town = r.town;
         });
       } catch (_) {}
+
+      // 场馆精确坐标（缺文件则不出点位，避免假点）
+      try {
+        const geo = await (await fetch('./data/red-sites.geo.json')).json();
+        VENUES = geo.filter(v => isFinite(v.lng) && isFinite(v.lat));
+      } catch (_) { VENUES = []; }
 
       addOverlayLayers();
       applyBasemap(true);
