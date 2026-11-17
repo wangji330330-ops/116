@@ -79,6 +79,10 @@ html, body {
   display: flex; align-items: center; gap: 12px;
   padding: 8px 16px 8px 8px;
   max-width: min(560px, calc(100vw - 32px));
+  /* 标题栏背景刻意淡化，让地图更透出来 */
+  background: rgba(253, 252, 249, .70);
+  border-color: rgba(201, 162, 39, .18);
+  box-shadow: 0 2px 10px rgba(28, 28, 30, .08);
 }
 
 .seal {
@@ -100,6 +104,10 @@ html, body {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .titles h1 .dot { color: var(--red); margin: 0 4px; }
+.titles h1 em {
+  font-style: normal; font-size: 12px; font-weight: 600;
+  color: var(--gold); margin-left: 6px; letter-spacing: 0;
+}
 .titles p {
   margin: 0; font-size: 11.5px; color: var(--ink-3); letter-spacing: .4px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -483,29 +491,35 @@ body.lbl-compact .pin--prov .pin__name { font-size: 10.5px; }
 .toast.is-on { opacity: 1; transform: translate(-50%, 0); }
 .toast .t-hi { color: var(--gold-lite); font-weight: 700; }
 
-/* ================= 左上 · 搜索 ================= */
-.hud--search {
-  top: calc(max(16px, env(safe-area-inset-top)) + 62px);
-  left: 16px;
-  width: min(300px, calc(100vw - 32px));
+/* ================= 搜索（点 ⌕ 展开，与右侧控件同区） ================= */
+.searchwrap {
+  position: absolute; z-index: 13;
+  top: calc(max(16px, env(safe-area-inset-top)) + 52px);
+  right: 16px;
+  width: min(280px, calc(100vw - 32px));
   display: flex; align-items: center; gap: 6px;
   padding: 5px 10px;
-  z-index: 12;
+  background: rgba(253, 252, 249, .96);
+  border: 1px solid rgba(201, 162, 39, .30);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  animation: dropIn .18s ease both;
 }
-.search__ico { color: var(--gold); font-size: 15px; line-height: 1; flex: none; }
-.hud--search input {
+@keyframes dropIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.searchwrap[hidden] { display: none; }
+.searchwrap input {
   flex: 1; min-width: 0;
   appearance: none; border: 0; outline: 0; background: transparent;
   font-family: var(--font); font-size: 12.5px; color: var(--ink);
   padding: 4px 0;
 }
-.hud--search input::placeholder { color: var(--ink-3); }
+.searchwrap input::placeholder { color: var(--ink-3); }
 .search__clear {
   appearance: none; border: 0; background: none; cursor: pointer;
   color: var(--ink-3); font-size: 15px; line-height: 1; padding: 0 2px;
   visibility: hidden;
 }
-.hud--search.has-q .search__clear { visibility: visible; }
+.searchwrap.has-q .search__clear { visibility: visible; }
 
 .qs {
   position: absolute; left: 0; right: 0; top: calc(100% + 6px);

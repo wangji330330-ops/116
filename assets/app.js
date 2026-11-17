@@ -658,8 +658,22 @@
   }
 
   /* ============================ 下钻 ============================ */
+  /* 本作品只做广东：其余省份只作版图参照，不提供进入 */
+  const GUANGDONG = '广东省';
+  let gdToastAt = 0;
+  function onlyGuangdong(name) {
+    if (name === GUANGDONG) return true;
+    const now = Date.now();
+    if (now - gdToastAt > 1500) {
+      gdToastAt = now;
+      toast('本作品仅收录<b class="t-hi">广东省</b>的红色资源，其他省份仅作版图参照。', 2800);
+    }
+    return false;
+  }
+
   function drillProvince(row) {
     const f = featOf(row);
+    if (!onlyGuangdong(propsOf(f).name)) return Promise.resolve();
     current.level = 1;
     current.province = f;
     current.city = null;
@@ -953,9 +967,23 @@
     });
     setProjection('mercator');   // 落地后转平面，换取交互流畅度
     lockToChina(true);
+
+    // 先看全国：34 个省级行政区依次弹出
     await resetToChina();
-    toast('已载入 <b class="t-hi">国家标准版中国地图</b> · 点击任一省份开始逐级展开。', 4200);
-    autoDrill();
+    toast('已载入 <b class="t-hi">国家标准版中国地图</b>', 2600);
+
+    const q = new URLSearchParams(location.search).get('go');
+    if (q) { autoDrill(); return; }
+
+    // 省份全部弹出后，自动进入广东（本作品只做广东）
+    await sleep(1400);
+    if (!countryFC) return;
+    const gd = countryFC.features.find(f => f.properties.name === GUANGDONG);
+    if (gd) {
+      toast('本作品聚焦 <b class="t-hi">广东省</b>，正在进入…', 2600);
+      await sleep(700);
+      drillProvince({ f: gd });
+    }
   }
 
   /* ====================== 深链接：?go=440000,440100 ====================== */
@@ -1080,10 +1108,11 @@
 
   /* ============================ 地图搜索框 ============================ */
   function setupSearch() {
-    const box = document.querySelector('.hud--search');
+    const box = document.getElementById('searchwrap');
     const input = document.getElementById('q');
     const drop = document.getElementById('qs');
     const clear = document.getElementById('q-clear');
+    const btn = document.getElementById('btn-search');
     if (!box || !input || !drop) return;
 
     let items = [];
@@ -1091,8 +1120,18 @@
 
     function close() { drop.hidden = true; drop.innerHTML = ''; active = -1; }
 
+    if (btn) {
+      btn.onclick = () => {
+        const show = box.hidden;
+        box.hidden = !show;
+        btn.classList.toggle('is-on', show);
+        if (show) { input.focus(); if (input.value.trim()) search(input.value); }
+        else { input.value = ''; search(''); close(); }
+      };
+    }
+
     function paint() {
-      input.parentElement.classList.toggle('has-q', !!input.value);
+      box.classList.toggle('has-q', !!input.value);
       if (!items.length) {
         drop.innerHTML = input.value.trim()
           ? '<div class="qs__empty">没有找到匹配项</div>' : '';
@@ -1110,7 +1149,7 @@
 
     function search(q) {
       const s = q.trim().toLowerCase();
-      if (!s) { items = []; active = -1; close(); input.parentElement.classList.remove('has-q'); return; }
+      if (!s) { items = []; active = -1; close(); box.classList.remove('has-q'); return; }
       items = RED_SITES
         .filter(x => `${x.name} ${x.addr} ${x.city} ${x.district || ''} ${x.town || ''}`.toLowerCase().includes(s))
         .slice(0, 12);
@@ -1130,7 +1169,13 @@
     });
 
     input.addEventListener('keydown', ev => {
-      if (ev.key === 'Escape') { input.value = ''; search(''); input.blur(); return; }
+      if (ev.key === 'Escape') {
+        input.value = ''; search('');
+        box.hidden = true;
+        if (btn) btn.classList.remove('is-on');
+        input.blur();
+        return;
+      }
       if (!items.length) return;
       if (ev.key === 'ArrowDown') { ev.preventDefault(); active = Math.min(items.length - 1, active + 1); paint(); }
       if (ev.key === 'ArrowUp') { ev.preventDefault(); active = Math.max(0, active - 1); paint(); }
@@ -1141,7 +1186,9 @@
       }
     });
 
-    document.addEventListener('click', ev => { if (!box.contains(ev.target)) close(); });
+    document.addEventListener('click', ev => {
+      if (!box.contains(ev.target) && ev.target !== btn) close();
+    });
   }
 
   /* ============================ 广东 3D 立体 ============================ */
@@ -1192,10 +1239,12 @@
         id: 'city-3d', type: 'fill-extrusion', source: 'city3d',
         paint: {
           'fill-extrusion-color': ['interpolate', ['linear'], ['get', 'red'],
-            0, '#e8c86a', 3, '#e8576b', 10, '#c8102e', 22, '#8c0a20'],
-          'fill-extrusion-height': ['+', 8000, ['*', ['get', 'red'], 7000]],
+            0, '#e9c9a8', 3, '#e08d7a', 8, '#cf4a4a', 16, '#a8121f'],
+          /* 只要一点起伏：基地 2km，每处红色场馆 +1.5km，
+             最高约 33km（约省域宽度的 3%），是浅浅的浮雕而非高塔 */
+          'fill-extrusion-height': ['+', 2000, ['*', ['get', 'red'], 1500]],
           'fill-extrusion-base': 0,
-          'fill-extrusion-opacity': 0.82
+          'fill-extrusion-opacity': 0.78
         }
       });
     }
@@ -1207,8 +1256,8 @@
     }
     // 平时锁死俯仰，进入 3D 时才临时放开
     try { map.setMaxPitch(70); } catch (_) {}
-    map.easeTo({ pitch: 52, bearing: -18, duration: 1200 });
-    toast('广东 <b class="t-hi">3D 立体地图</b>：柱体高度 = 该市收录的红色场馆数量', 4600);
+    map.easeTo({ pitch: 46, bearing: -14, duration: 1200 });
+    toast('广东 <b class="t-hi">立体浮雕</b>：起伏高度 = 该市收录的红色场馆数量（轻微起伏，不遮挡底图）', 4600);
   }
 
   /* ============================ 红色传承：铺满屏幕即显示 ============================ */
