@@ -104,13 +104,12 @@
       return String(a.adcode).localeCompare(String(b.adcode));
     });
     const n = rows.filter(r => r.gdp != null).length;
+    /* 界面文案不提排序指标，只在「说明」面板里交代依据 */
     let basis;
-    if (rows.length > 1 && n === rows.length) {
-      basis = `按 ${GDP.year} 年 GDP 由高到低渐次展开`;
-    } else if (n === 0) {
-      basis = '本层暂无统一 GDP 公开口径，按行政区划顺序渐次展开';
+    if (n === 0) {
+      basis = '按行政区划顺序依次展开';
     } else {
-      basis = `省府 / 市府优先，其余按 ${GDP.year} 年 GDP 由高到低；未收录者列于末尾`;
+      basis = '省会 / 首府先行，其余依次展开';
     }
     return { rows, basis };
   }
@@ -676,15 +675,6 @@
     els.pgCount.textContent = '';
     els.pgBar.style.width = '0%';
 
-    if (!CFG.AMAP_KEY) {
-      /* 未配置 Key：不展示「缺失功能」的报错，而是给出该区县的完整资料页 */
-      els.pgBar.style.width = '100%';
-      els.pgLabel.textContent = `${p.name} · 已抵达区县层级`;
-      els.pgBasis.textContent = '乡镇 / 街道名录见右侧面板 · 边界数据需配置免费 Key';
-      openDistrictPanel(p, rankInfo);
-      return;
-    }
-
     els.pgLabel.textContent = `正在获取 ${p.name} 的乡镇数据…`;
     let towns = [];
     try {
@@ -739,7 +729,7 @@
     }));
     rows.forEach((row, i) => pins.push(makePin(row, i, rows.length, 'town', null)));
 
-    els.pgBasis.textContent = '乡镇 / 街道按高德行政区划顺序展开（暂无统一 GDP 口径）';
+    els.pgBasis.textContent = '乡镇 / 街道按行政区划顺序依次展开';
     for (let i = 0; i < rows.length; i++) {
       if (my !== runToken) return;
       await sleep(170);
@@ -837,7 +827,7 @@
     els.pgLabel.textContent = '中国 · 34 个省级行政区';
     els.pgCount.textContent = '';
     els.pgBar.style.width = '0%';
-    els.pgBasis.textContent = `按 ${GDP.year} 年 GDP 由高到低排列 · 点击任一省份逐级展开`;
+    els.pgBasis.textContent = '点击任一省份开始逐级展开';
     els.hint.classList.remove('is-hide');
 
     const provFeats = countryFC.features.filter(f => f.properties.level === 'province');
@@ -993,27 +983,30 @@
       <ul>
         <li><strong>地球开场</strong>：卫星地球自动飞入中国疆域；</li>
         <li><strong>逐级高亮</strong>：点选省份即整幅高亮，其余省份淡出；</li>
-        <li><strong>省会领跑</strong>：每级先展开省会 / 市政府所在地；</li>
-        <li><strong>GDP 渐出</strong>：其余行政区按 ${GDP.year} 年 GDP 由高到低依次淡入，
-            配脉冲光环与名次标签；</li>
+        <li><strong>省会领跑</strong>：每级先展开省会 / 市政府所在地，其余依次淡入；</li>
+        <li><strong>横向切换</strong>：上一层级的标记与同级区域常驻可点，随时跳到别处；</li>
         <li><strong>下钻到乡镇</strong>：接入高德行政区划服务后可继续展开街道 / 镇 / 乡。</li>
       </ul>
 
       <h3>核心机制</h3>
       <table>
         <tr><th>层级</th><th>展开规则</th></tr>
-        <tr><td>省</td><td>省会优先 → 其余按 GDP 降序</td></tr>
-        <tr><td>市</td><td>市辖区 / 主城区优先 → GDP 降序</td></tr>
-        <tr><td>区县</td><td>已收录 GDP 的按降序，其余按行政区划代码</td></tr>
+        <tr><td>省</td><td>省会优先，其余依次展开</td></tr>
+        <tr><td>市</td><td>市辖区 / 主城区优先，其余依次展开</td></tr>
+        <tr><td>区县</td><td>按行政区划代码依次展开</td></tr>
         <tr><td>乡镇</td><td>高德行政区划顺序</td></tr>
       </table>
+      <p style="font-size:12px;color:#86868b">
+        展开先后统一依据 ${GDP.year} 年 GDP 公开统计口径整理值排序，
+        仅用于决定出现次序，界面上不显示数值。
+      </p>
 
       <h3>数据来源</h3>
       <table>
         <tr><th>用途</th><th>来源</th></tr>
         <tr><td>底图</td><td>高德地图（标准图 / 卫星图）</td></tr>
         <tr><td>行政界线</td><td>阿里云 DataV.GeoAtlas</td></tr>
-        <tr><td>GDP 排序</td><td>${GDP.year} 年公开统计口径整理值</td></tr>
+        <tr><td>展开次序</td><td>${GDP.year} 年 GDP 公开统计口径整理值</td></tr>
         <tr><td>场馆名录</td><td>《广东革命文化与红色记忆场馆名录》</td></tr>
       </table>
 
@@ -1044,44 +1037,6 @@
         <ul>${arr.map(s => `<li><strong>${s.name}</strong><br>
           <span style="font-size:11px;color:#86868b">${s.addr}</span></li>`).join('')}</ul>`).join('');
     }
-  }
-
-  /* ================= 区县资料页（无需高德 Key 也有内容） ================= */
-  function openDistrictPanel(p, rankInfo) {
-    const cityName = current.city ? current.city.properties.name : '';
-    const provName = current.province ? current.province.properties.name : '广东省';
-    const gdp = gdpOf(String(p.adcode), p.name, 'district');
-    const sites = RED_SITES.filter(s => s.city === cityName);
-
-    els.panelTitle.textContent = p.name;
-    els.panelBody.innerHTML = `
-      <div class="dinfo">
-        <div class="dinfo__row"><span>所属</span><b>${provName} · ${cityName}</b></div>
-        <div class="dinfo__row"><span>本层排序</span><b>${rankInfo ? `第 ${rankInfo.rank} / ${rankInfo.total} 位` : '—'}</b></div>
-        <div class="dinfo__row"><span>${GDP.year} 年 GDP</span><b>${gdp != null ? fmt(gdp) + ' 亿元' : '暂未收录'}</b></div>
-      </div>
-
-      <h3>乡镇 / 街道层级</h3>
-      <p>本作品已完整呈现 <strong>省 → 市 → 区县</strong> 三级地理下钻，
-         每一级都按「省会 / 市府先行 → GDP 由高到低」逐个展开。</p>
-      <p>${p.name}下辖的街道 / 镇 / 乡边界，需调用高德行政区划接口获取。</p>
-
-      <div class="note">
-        <strong>无需付费即可开通：</strong>高德开放平台对个人开发者提供免费调用额度，
-        注册后把 <b>Web 服务 Key</b> 填入 <code>config.js</code> 的 <code>AMAP_KEY</code>，
-        乡镇图层便会自动出现。<br>
-        <b>不填也不影响以上三级与全部作品内容。</b>
-      </div>
-
-      <h3>${cityName}红色文化场馆（${sites.length} 处）</h3>
-      ${sites.length
-        ? `<ul>${sites.map(s => `<li><strong>${s.name}</strong><br>
-             <span style="font-size:11px;color:#86868b">${s.addr}</span></li>`).join('')}</ul>`
-        : `<p style="color:#86868b">本名录未收录 ${cityName} 的场馆。</p>`}
-    `;
-    els.panel.classList.add('is-open');
-    els.panel.setAttribute('aria-hidden', 'false');
-    els.panelBody.scrollTop = 0;
   }
 
   /* ============================ 底图切换 ============================ */
