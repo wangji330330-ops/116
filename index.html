@@ -103,6 +103,15 @@ window.addEventListener('unhandledrejection', function (e) {
   <!-- 弹层 -->
   <div class="toast" id="toast"></div>
 
+  <!-- 悬停提示：跟随指针显示所属 -->
+  <div class="tip" id="tip" hidden></div>
+
+  <!-- 点击区块后显示的信息卡（不遮挡拖动） -->
+  <div class="spot" id="spot" hidden>
+    <button class="spot__close" id="spot-close" aria-label="关闭">×</button>
+    <div class="spot__body" id="spot-body"></div>
+  </div>
+
   <!-- 隐藏界面后的恢复按钮（始终可点） -->
   <button class="ui-restore" id="btn-show" title="显示界面（快捷键 H）">
     <span class="ui-restore__ico">▤</span> 显示界面

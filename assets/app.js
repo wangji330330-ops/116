@@ -16,6 +16,8 @@
 
   const GEO   = './data/geo/';
   const CACHE = new Map();
+  const INFLIGHT = new Map();
+  const PREFETCHED = new Set();
 
   const RED = '#c8102e', RED_DEEP = '#8c0a20', GOLD = '#c9a227';
 
@@ -142,17 +144,12 @@
     el.type = 'button';
     el.className = `pin pin--${kind}` + (row.isCapital ? ' pin--core' : '');
     el.setAttribute('aria-label', row.name);
+    /* 只显示地名：弹出顺序仍按省会先行 → GDP 由高到低，但不展示 GDP 数值 */
     el.innerHTML =
       '<span class="pin__ring"></span><span class="pin__dot"></span>' +
-      '<span class="pin__card"><span class="pin__name"></span>' +
-      '<span class="pin__sub"></span><span class="pin__rank"></span></span>';
+      '<span class="pin__card"><span class="pin__name"></span></span>';
 
     el.querySelector('.pin__name').textContent = row.name;
-    el.querySelector('.pin__sub').textContent =
-      row.gdp != null ? `${fmt(row.gdp)} 亿元`
-        : (row.isCapital ? '省会 / 首府' : '');
-    el.querySelector('.pin__rank').textContent =
-      (total > 1 && row.gdp != null) ? `第 ${rank + 1} 位${row.isCapital ? ' · 优先展开' : ''}` : '';
 
     if (onClick) el.addEventListener('click', ev => { ev.stopPropagation(); onClick(row); });
 
@@ -307,6 +304,96 @@
     if (selDetailId) setState('detail', selDetailId, { selected: true });
   }
 
+  /* ============================ 悬停 / 点击信息 ============================ */
+  const tipEl = document.getElementById('tip');
+  const spotEl = document.getElementById('spot');
+  const spotBody = document.getElementById('spot-body');
+
+  /* 行政区划完整层级：中国 › 广东省 › 广州市 › 天河区 */
+  function pathOf(props) {
+    const parts = [];
+    if (props.level !== 'province' && current.province) parts.push(current.province.properties.name);
+    if (props.level === 'district' && current.city) parts.push(current.city.properties.name);
+    if (props.level === 'town' && current.region) parts.push(current.region.properties.name);
+    parts.push(props.name);
+    return parts.join(' › ');
+  }
+
+  /* 悬停提示（rAF 节流，跟随指针） */
+  let tipRaf = 0, tipPending = null;
+  function showTip(props, point) {
+    tipPending = { props, point };
+    if (tipRaf) return;
+    tipRaf = requestAnimationFrame(() => {
+      tipRaf = 0;
+      if (!tipPending) return;
+      const { props: p, point: pt } = tipPending;
+      tipEl.innerHTML = `<span class="tip__name">${p.name}</span>` +
+        (p.level === 'province' ? '' : `<span class="tip__path">${pathOf(p)}</span>`);
+      tipEl.style.left = pt.x + 'px';
+      tipEl.style.top = pt.y + 'px';
+      tipEl.hidden = false;
+      tipEl.classList.add('is-on');
+    });
+  }
+  function hideTip() {
+    tipPending = null;
+    tipEl.classList.remove('is-on');
+    if (!tipEl.hidden) setTimeout(() => { if (!tipEl.classList.contains('is-on')) tipEl.hidden = true; }, 140);
+  }
+
+  /* 点击区块后的信息卡：只占一角，地图仍可自由拖动 */
+  function hideSpot() {
+    spotEl.classList.remove('is-on');
+    if (!spotEl.hidden) setTimeout(() => { if (!spotEl.classList.contains('is-on')) spotEl.hidden = true; }, 200);
+  }
+
+  function showSpot(props, point, feature) {
+    const p = props;
+    const path = pathOf(p);
+    const cityName = p.level === 'city' ? p.name
+      : (current.city ? current.city.properties.name : (current.province ? current.province.properties.name : ''));
+    const sites = p.level === 'district' || p.level === 'city'
+      ? RED_SITES.filter(s => s.city === cityName)
+      : [];
+
+    spotBody.innerHTML = `
+      <p class="spot__name">${p.name}</p>
+      <p class="spot__path">${path}</p>
+      <div class="spot__row"><span>所属</span><b>${path.split(' › ').slice(0, -1).join(' › ') || '中国'}</b></div>
+      <div class="spot__row"><span>层级</span><b>${
+        p.level === 'province' ? '省级行政区'
+        : p.level === 'city' ? '地级行政区'
+        : p.level === 'district' ? '县级行政区' : '乡镇 / 街道'}</b></div>
+      ${sites.length ? `<div class="spot__row" style="display:block">
+          <span style="display:block;margin-bottom:2px">${cityName}红色场馆（${sites.length}）</span>
+          <ul class="spot__sites">${sites.slice(0, 4).map(s => `<li>${s.name}</li>`).join('')}
+          ${sites.length > 4 ? `<li>…等 ${sites.length} 处，详见「说明」</li>` : ''}</ul>
+        </div>` : ''}
+      ${CFG.AMAP_KEY && p.level === 'district' && feature
+        ? `<button class="spot__more" id="spot-more">展开街道 / 乡镇</button>` : ''}
+      <div class="spot__hint">拖动地图可继续浏览，卡片会自动收起</div>
+    `;
+
+    if (CFG.AMAP_KEY && p.level === 'district' && feature) {
+      const b = document.getElementById('spot-more');
+      if (b) b.onclick = () => { hideSpot(); openTownship(feature); };
+    }
+
+    // 定位：优先放在点击点右侧，越界则翻到左侧 / 上方
+    const W = 300, H = 190;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    let x = point ? point.x + 16 : (vw - W) / 2;
+    let y = point ? point.y + 14 : (vh - H) / 2;
+    if (x + W > vw - 12) x = Math.max(12, (point ? point.x : vw / 2) - W - 16);
+    if (y + H > vh - 12) y = Math.max(12, (point ? point.y : vh / 2) - H - 14);
+
+    spotEl.style.left = x + 'px';
+    spotEl.style.top = y + 'px';
+    spotEl.hidden = false;
+    requestAnimationFrame(() => spotEl.classList.add('is-on'));
+  }
+
   /* ============================ 图层数据 ============================ */
   function setDetail(features) {
     selDetailId = null;
@@ -324,32 +411,41 @@
   /* ============================ 读取下级 ============================ */
   /* 全部行政区划边界均已本地打包（省级 + 地级市），
      不依赖任何第三方接口，打开即用、离线可用 */
+  function normalize(gj) {
+    return gj.features.map(f => ({ ...f, id: String(f.properties.adcode) }));
+  }
+
   async function loadChildren(adcode) {
     const ad = String(adcode);
     if (CACHE.has(ad)) return CACHE.get(ad);
-    try {
-      const r = await fetch(`${GEO}${ad}_full.json`);
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      const gj = await r.json();
-      const feats = gj.features.map(f => ({ ...f, id: String(f.properties.adcode) }));
-      CACHE.set(ad, feats);
-      return feats;
-    } catch (_) {
-      CACHE.set(ad, []);
-      return [];
-    }
+    if (INFLIGHT.has(ad)) return INFLIGHT.get(ad);
+    const job = fetch(`${GEO}${ad}_full.json`)
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(gj => { const feats = normalize(gj); CACHE.set(ad, feats); return feats; })
+      .catch(() => { CACHE.set(ad, []); return []; })
+      .finally(() => INFLIGHT.delete(ad));
+    INFLIGHT.set(ad, job);
+    return job;
+  }
+
+  /* 预取：鼠标划过区块 / 上一级展开完成后，提前把下一级边界取进内存，
+     真正点击时基本可以瞬间出图 */
+  function prefetchChildren(adcode) {
+    const ad = String(adcode);
+    if (!ad || CACHE.has(ad) || INFLIGHT.has(ad) || PREFETCHED.has(ad)) return;
+    PREFETCHED.add(ad);
+    loadChildren(ad);
   }
 
   /* ============================ 展开一个区域的下级 ============================ */
-  async function openRegion(feature, { level } = {}) {
+  async function openRegion(feature, { preload = null } = {}) {
     const my = ++runToken;
     clearPins();
 
     const p = propsOf(feature);
     const adcode = String(p.adcode);
     const name = p.name;
-    const isProv = p.level === 'province';
-    const feats = await loadChildren(adcode);
+    const feats = await (preload || loadChildren(adcode));
     if (my !== runToken) return;
 
     setFocus([feature]);
@@ -376,7 +472,10 @@
     els.pgBar.style.width = '0%';
     els.hint.classList.add('is-hide');
 
-    const gap = rows.length > 26 ? 120 : rows.length > 14 ? 200 : 320;
+    /* 区块轮廓先整体淡入，标签再逐个弹出，避免「等很久什么都没有」 */
+    rows.forEach(row => tweenState('detail', row.adcode, 'reveal', 0, 0.45, 260));
+
+    const gap = rows.length > 26 ? 60 : rows.length > 14 ? 90 : 120;
 
     for (let i = 0; i < rows.length; i++) {
       if (my !== runToken) return;
@@ -386,8 +485,8 @@
       const row = rows[i];
       const pin = pins[i];
       pin.el.classList.add('is-on', 'is-now');
-      tweenState('detail', row.adcode, 'reveal', 0, 1, 560);
-      setTimeout(() => pin.el.classList.remove('is-now'), 1650);
+      tweenState('detail', row.adcode, 'reveal', 0.45, 1, 380);
+      setTimeout(() => pin.el.classList.remove('is-now'), 1200);
       scheduleDeclutter();
 
       els.pgLabel.textContent = row.name;
@@ -398,11 +497,29 @@
     if (my === runToken) {
       els.pgLabel.textContent = `已展开 ${rows.length} 个${kind === 'city' ? '市 / 州' : '区 / 县'}`;
       els.pgBasis.textContent = basis + ' · 点击任一区域继续下钻';
+      schedulePrefetch(rows);
     }
   }
 
+  /* 展开完成后，空闲时预取下一级边界，让后续点击秒开 */
+  let prefetchTimer = null;
+  function schedulePrefetch(rows) {
+    clearTimeout(prefetchTimer);
+    prefetchTimer = setTimeout(() => {
+      const targets = rows.filter(r => r.level === 'city' && r.f);
+      let i = 0;
+      const step = () => {
+        if (i >= targets.length) return;
+        // 每次只预取 3 个，避免抢占带宽影响当前交互
+        for (let k = 0; k < 3 && i < targets.length; k++, i++) prefetchChildren(targets[i].adcode);
+        prefetchTimer = setTimeout(step, 260);
+      };
+      step();
+    }, 900);
+  }
+
   /* ============================ 下钻 ============================ */
-  async function drillProvince(row) {
+  function drillProvince(row) {
     const f = featOf(row);
     current.level = 1;
     current.province = f;
@@ -410,10 +527,11 @@
     current.region = f;
 
     selectProvince(f.properties.adcode);
+    // 数据加载与渐次展开立刻开始，镜头同时飞行，二者并行
+    const opening = openRegion(f);
     // 四边等距 → 该省几何中心落在屏幕正中
-    centerOn([f], { maxZoom: 7.4, padding: 80 });
-    await sleep(760);
-    await openRegion(f);
+    centerOn([f], { maxZoom: 7.4, padding: 80, duration: 900 });
+    return opening;
   }
 
   async function drillInto(row) {
@@ -427,11 +545,14 @@
     else { current.level = 3; }
 
     selectDetail(p.adcode);
-    fitFeature([f], { maxZoom: 10.8, padding: 30 });
-    await sleep(560);
 
-    if (p.level === 'district') return openTownship(f);
-    await openRegion(f);
+    // 区县级：只弹出信息卡，不移动视野
+    if (p.level === 'district') return showSpot(p, null, f);
+
+    // 市 → 区县：先出图形和标签，镜头同时飞过去
+    const opening = openRegion(f);
+    fitFeature([f], { maxZoom: 10.8, padding: 30, duration: 850 });
+    return opening;
   }
 
   /* ============================ 乡镇级 ============================ */
@@ -649,8 +770,17 @@
     try { map.setProjection({ type: kind }); } catch (_) {}
   }
 
+  /* 落地中国后限制可平移范围，彻底杜绝拖到两极出现瓦片拉花；
+     范围留足余量（含港澳台与南海），既不影响看全国，也够不到极点。
+     开场地球阶段不加限制，保证「地球 → 中国」的镜头自由 */
+  const CHINA_PAN_BOUNDS = [[40, -12], [165, 70]];
+  function lockToChina(on) {
+    try { map.setMaxBounds(on ? CHINA_PAN_BOUNDS : null); } catch (_) {}
+  }
+
   async function intro() {
     els.boot.classList.add('is-gone');
+    lockToChina(false);
     setProjection('globe');
     map.jumpTo({ center: [101, 16], zoom: 1.35, pitch: 0, bearing: 0 });
     await sleep(900);
@@ -661,6 +791,7 @@
       setTimeout(done, 5200);
     });
     setProjection('mercator');   // 落地后转平面，换取交互流畅度
+    lockToChina(true);
     await resetToChina();
     toast('已载入 <b class="t-hi">国家标准版中国地图</b> · 点击任一省份开始逐级展开。', 4200);
     autoDrill();
@@ -922,10 +1053,12 @@
     };
     document.getElementById('btn-panel').onclick = openPanel;
     document.getElementById('panel-close').onclick = closePanel;
+    document.getElementById('spot-close').onclick = hideSpot;
 
     window.addEventListener('keydown', ev => {
       if (ev.key === 'Escape') {
-        if (els.panel.classList.contains('is-open')) closePanel();
+        if (!spotEl.hidden) hideSpot();
+        else if (els.panel.classList.contains('is-open')) closePanel();
         else if (app.classList.contains('ui-hidden')) setUIHidden(false);
         else backOne();
       }
@@ -1023,29 +1156,58 @@
   }
 
   function bindMapEvents() {
+    /* —— 悬停：显示所属 + 预取下一级边界 —— */
     [['prov-fill'], ['detail-fill']].forEach(([layer]) => {
       map.on('mousemove', layer, e => {
         map.getCanvas().style.cursor = 'pointer';
         const f = e.features && e.features[0];
-        if (f) setState(f.source, f.id, { hover: true });
+        if (!f) return;
+        setState(f.source, f.id, { hover: true });
+
+        // 悬停预取：真正点下去时边界已在内存里
+        const p = f.properties || {};
+        if (p.adcode && (p.level === 'province' || p.level === 'city')) prefetchChildren(p.adcode);
+
+        showTip(p, e.point);
       });
       map.on('mouseleave', layer, e => {
         map.getCanvas().style.cursor = '';
         const f = e.features && e.features[0];
         if (f) setState(f.source, f.id, { hover: false });
+        hideTip();
       });
     });
 
+    /* —— 点击：省份 / 地级市 下钻；区县 弹出信息卡 —— */
     map.on('click', 'prov-fill', e => {
-      // 若点击处已落在下级区域内，交给 detail 处理，避免重复下钻
+      // 点击处若落在下级区域上，交给 detail 层处理，避免重复下钻
       if (map.queryRenderedFeatures(e.point, { layers: ['detail-fill'] }).length) return;
       const f = e.features && e.features[0];
-      if (f) drillProvince({ f });
+      if (!f) return;
+      if (current.level === 0) drillProvince({ f });
+      else showSpot(f.properties, e.point, f);
     });
 
     map.on('click', 'detail-fill', e => {
       const f = e.features && e.features[0];
-      if (f) drillInto({ f });
+      if (!f) return;
+      const p = f.properties || {};
+      // 区县级：只显示所属信息，不再夺走视野
+      if (p.level === 'district' || p.level === 'town') showSpot(p, e.point, f);
+      else drillInto({ f });
+    });
+
+    /* 地图一移动就收起信息卡，保证拖动永远不被遮挡 */
+    map.on('movestart dragstart zoomstart', () => { hideSpot(); hideTip(); });
+
+    /* 球面/平面投影在两极附近都会出现瓦片拉花，
+       限制中心纬度，避免把极点拖到屏幕中央 */
+    map.on('moveend', () => {
+      const c = map.getCenter();
+      const LIMIT = 72;
+      if (Math.abs(c.lat) > LIMIT) {
+        map.easeTo({ center: [c.lng, c.lat > 0 ? LIMIT : -LIMIT], duration: 220 });
+      }
     });
 
     map.on('moveend', () => { applyBasemap(); updateLabelMode(); scheduleDeclutter(); });
