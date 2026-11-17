@@ -282,6 +282,28 @@ html, body {
 .pin--core .pin__card { opacity: 1; transform: translate(-50%, 0) scale(1); }
 .pin--core .pin__name { color: var(--red-deep); }
 
+/* 层级优先：上一层兄弟标记沉到下面，不遮挡当前层级 */
+.pin--ctx {
+  z-index: -1;
+  opacity: .55;
+}
+.pin--ctx .pin__dot {
+  width: 8px; height: 8px; border-width: 1.5px;
+  background: #fff;
+  border-color: var(--red-soft);
+  box-shadow: 0 1px 4px rgba(140, 10, 32, .28);
+}
+.pin--ctx .pin__card {
+  background: rgba(253, 252, 249, .90);
+  border-color: rgba(200, 16, 46, .22);
+  box-shadow: 0 1px 6px rgba(28, 28, 30, .12);
+}
+.pin--ctx .pin__name { font-size: 10px; color: var(--ink-2); font-weight: 600; }
+.pin--ctx:hover { opacity: 1; }
+.pin--ctx:hover .pin__dot { background: var(--red); border-color: #fff; }
+.pin--ctx:hover .pin__card { border-color: rgba(200, 16, 46, .45); }
+.pin--ctx.is-dim { opacity: .2; }
+
 /* 标签避让：通过 lab-on 决定是否常驻显示 */
 .pin.lab-on .pin__card { opacity: 1; transform: translate(-50%, 0) scale(1); }
 .pin.lab-on.lab-above .pin__card { transform: translate(-50%, 0) scale(1); }

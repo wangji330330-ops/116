@@ -119,6 +119,7 @@
   let map;
   let countryFC = null;
   let pins = [];
+  let parentPins = [];       // 上一级的兄弟标记：保持可见可点，随时横向切换
   let runToken = 0;
   let selProvId = null;
   let selDetailId = null;
@@ -167,6 +168,25 @@
     pins = [];
   }
 
+  /* 进入下一级时，把当前层级的标记「降级」而不是删掉：
+     它们变成上一层兄弟标记，样式变淡但仍可点击，
+     这样任何时候都能点别的省 / 市 / 区县直接跳过去。 */
+  function demotePins() {
+    parentPins.forEach(p => p.wrap.remove());
+    parentPins = pins.map(p => {
+      p.el.classList.add('pin--ctx');
+      p.el.classList.remove('is-now');
+      return p;
+    });
+    pins = [];
+  }
+
+  function clearAllPins() {
+    clearPins();
+    parentPins.forEach(p => p.wrap.remove());
+    parentPins = [];
+  }
+
   /* ------------------------ 标签避让（防重叠） ------------------------ */
   let declutterTimer = null;
   function scheduleDeclutter() {
@@ -188,15 +208,14 @@
   }
 
   function invalidateSizes() {
-    pins.forEach(p => { p._w = 0; p._h = 0; });
+    pins.concat(parentPins).forEach(p => { p._w = 0; p._h = 0; });
   }
 
   function declutter() {
-    const order = pins.slice().sort((a, b) => {
-      const fa = ALWAYS_LABEL.has(String(a.row.adcode)) ? 1 : 0;
-      const fb = ALWAYS_LABEL.has(String(b.row.adcode)) ? 1 : 0;
-      return fa - fb;
-    });
+    // 当前层级优先级最高，上一层兄弟标记最先被挤掉；港澳台始终保留
+    const rankOf = (p) => ALWAYS_LABEL.has(String(p.row.adcode)) ? 0
+      : (parentPins.includes(p) ? 2 : 1);
+    const order = pins.concat(parentPins).sort((a, b) => rankOf(a) - rankOf(b));
 
     // —— 阶段一：全部读取（无写入） ——
     order.forEach(p => { if (p.el.classList.contains('is-on')) cachePinSize(p); });
@@ -290,7 +309,8 @@
       countryFC.features.forEach(f => setState('prov', String(f.properties.adcode), { dim: false, selected: false }));
     }
 
-    pins.forEach(p => {
+    pins.forEach(p => p.el.classList.toggle('is-dim', false));
+    pins.concat(parentPins).forEach(p => {
       if (p.row.level === 'province' || p.el.classList.contains('pin--prov')) {
         p.el.classList.toggle('is-dim', !!selProvId && String(p.row.adcode) !== selProvId);
       }
@@ -408,6 +428,71 @@
     if (s) s.setData({ type: 'FeatureCollection', features });
   }
 
+  /* 同级上下文：把「当前区域的兄弟」放进一个常驻可点图层。
+     例如进入广州市后，广东省其余 20 个市依然可见、可点，直接跳转即可。 */
+  function setContext(features) {
+    const s = map.getSource('context');
+    if (!s) return;
+    const cur = current.region ? String(current.region.properties.adcode) : null;
+    const list = (features || []).filter(f => String(f.properties.adcode) !== cur);
+    s.setData({ type: 'FeatureCollection', features: list });
+    list.forEach(f => setState('context', f.properties.adcode, { hover: false }));
+  }
+
+  /* 取某个区域的同级兄弟（其父级的全部下级）
+     —— 注意：要素经 MapLibre 图层取回后，嵌套属性会变成 JSON 字符串，
+        这里统一兼容对象与字符串两种形态 */
+  function parentAdcode(p) {
+    let v = p && p.parent;
+    if (!v) return null;
+    if (typeof v === 'string') {
+      try { v = JSON.parse(v); } catch (_) { return null; }
+    }
+    return v && v.adcode != null ? String(v.adcode) : null;
+  }
+
+  async function siblingsOf(feature) {
+    const p = propsOf(feature);
+    const parent = parentAdcode(p);
+    if (!parent) return [];
+    if (parent === '100000') return [];   // 省级的兄弟就是全部省份，已在 prov 图层
+    return (await loadChildren(parent)) || [];
+  }
+
+  /* 在所有已加载数据里按 adcode 找要素 */
+  function findAnywhere(adcode) {
+    const ad = String(adcode);
+    if (countryFC) {
+      const f = countryFC.features.find(x => String(x.properties.adcode) === ad);
+      if (f) return f;
+    }
+    for (const list of CACHE.values()) {
+      if (!list) continue;
+      const f = list.find(x => String(x.properties.adcode) === ad);
+      if (f) return f;
+    }
+    return null;
+  }
+
+  /* 顺着 parent 链把 current.province / current.city 补齐。
+     这样从任何地方点过来（哪怕是别的省的区县）层级都不会错。 */
+  function syncAncestors(p) {
+    let city = null, prov = null;
+    let cur = parentAdcode(p);
+    let guard = 0;
+    while (cur && guard++ < 5) {
+      const f = findAnywhere(cur);
+      if (!f) break;
+      const fp = f.properties;
+      if (fp.level === 'city') city = f;
+      else if (fp.level === 'province') prov = f;
+      cur = parentAdcode(fp);
+    }
+    if (prov) current.province = prov;
+    if (p.level === 'city') { current.city = null; }
+    else if (city) current.city = city;
+  }
+
   /* ============================ 读取下级 ============================ */
   /* 全部行政区划边界均已本地打包（省级 + 地级市），
      不依赖任何第三方接口，打开即用、离线可用 */
@@ -440,7 +525,7 @@
   /* ============================ 展开一个区域的下级 ============================ */
   async function openRegion(feature, { preload = null } = {}) {
     const my = ++runToken;
-    clearPins();
+    demotePins();
 
     const p = propsOf(feature);
     const adcode = String(p.adcode);
@@ -449,6 +534,7 @@
     if (my !== runToken) return;
 
     setFocus([feature]);
+    siblingsOf(feature).then(list => { if (my === runToken) setContext(list); });
 
     if (!feats.length) {
       setDetail([]);
@@ -540,14 +626,31 @@
 
     if (p.level === 'province') return drillProvince(row);
 
+    // 先把所属省市补齐（可能来自别的省 / 别的市）
+    syncAncestors(p);
+
     current.region = f;
     if (p.level === 'city') { current.city = f; current.level = 2; }
     else { current.level = 3; }
 
     selectDetail(p.adcode);
 
-    // 区县级：只弹出信息卡，不移动视野
-    if (p.level === 'district') return showSpot(p, null, f);
+    // 进入区县：聚焦 + 适度拉近，并保留兄弟区县可继续点击
+    if (p.level === 'district' || p.level === 'town') {
+      demotePins();
+      setFocus([f]);
+      setDetail([]);
+      selectDetail(p.adcode);
+      siblingsOf(f).then(list => { setContext(list); });
+      fitFeature([f], { maxZoom: 11, padding: 120, duration: 780 });
+      updateCrumb();
+      els.pgLabel.textContent = `${p.name} · 县级行政区`;
+      els.pgCount.textContent = '';
+      els.pgBar.style.width = '100%';
+      els.pgBasis.textContent = '点击周边区县可直接切换 · 拖动地图浏览';
+      showSpot(p, null, f);
+      return;
+    }
 
     // 市 → 区县：先出图形和标签，镜头同时飞过去
     const opening = openRegion(f);
@@ -564,7 +667,7 @@
     const hit = pins.find(x => String(x.row.adcode) === String(p.adcode));
     const rankInfo = hit ? { rank: hit.rank + 1, total: pins.length } : null;
 
-    clearPins();
+    demotePins();
     setFocus([feature]);
     setDetail([]);
     updateCrumb();
@@ -628,7 +731,7 @@
     });
 
     setDetail(feats);
-    clearPins();
+    demotePins();
 
     const rows = feats.map(f => ({
       f, adcode: String(f.properties.adcode), name: f.properties.name,
@@ -721,9 +824,10 @@
   /* ============================ 回到全国 ============================ */
   async function resetToChina({ animate = true } = {}) {
     const my = ++runToken;
-    clearPins();
+    clearAllPins();
     setDetail([]);
     setFocus([]);
+    setContext([]);
     selectDetail(null);
     selectProvince(null);
 
@@ -1132,6 +1236,25 @@
       id: 'focus-line', type: 'line', source: 'focus',
       paint: { 'line-color': RED_DEEP, 'line-width': 2.6, 'line-opacity': 0.9 }
     });
+    /* 同级上下文：当前区域的「兄弟」行政区，保持可见且可点击，
+       随时可以直接跳到别的省 / 市 / 区县，不必先退回上一级 */
+    map.addLayer({
+      id: 'context-fill', type: 'fill', source: 'context',
+      paint: {
+        'fill-color': ['case', ['boolean', ['feature-state', 'hover'], false], RED, RED],
+        'fill-opacity': ['case',
+          ['boolean', ['feature-state', 'hover'], false], 0.16, 0.03]
+      }
+    });
+    map.addLayer({
+      id: 'context-line', type: 'line', source: 'context',
+      paint: {
+        'line-color': ['case', ['boolean', ['feature-state', 'hover'], false], RED_DEEP, GOLD],
+        'line-width': ['case', ['boolean', ['feature-state', 'hover'], false], 1.8, 1.1],
+        'line-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.95, 0.55],
+        'line-dasharray': [2, 1.4]
+      }
+    });
     map.addLayer({
       id: 'detail-fill', type: 'fill', source: 'detail',
       paint: {
@@ -1157,7 +1280,7 @@
 
   function bindMapEvents() {
     /* —— 悬停：显示所属 + 预取下一级边界 —— */
-    [['prov-fill'], ['detail-fill']].forEach(([layer]) => {
+    ['prov-fill', 'context-fill', 'detail-fill'].forEach(layer => {
       map.on('mousemove', layer, e => {
         map.getCanvas().style.cursor = 'pointer';
         const f = e.features && e.features[0];
@@ -1178,24 +1301,30 @@
       });
     });
 
-    /* —— 点击：省份 / 地级市 下钻；区县 弹出信息卡 —— */
-    map.on('click', 'prov-fill', e => {
-      // 点击处若落在下级区域上，交给 detail 层处理，避免重复下钻
-      if (map.queryRenderedFeatures(e.point, { layers: ['detail-fill'] }).length) return;
-      const f = e.features && e.features[0];
-      if (!f) return;
-      if (current.level === 0) drillProvince({ f });
-      else showSpot(f.properties, e.point, f);
-    });
-
-    map.on('click', 'detail-fill', e => {
-      const f = e.features && e.features[0];
+    /* —— 点击：无论当前在哪一级，点谁就进入谁 —— */
+    function enterAt(f, point) {
       if (!f) return;
       const p = f.properties || {};
-      // 区县级：只显示所属信息，不再夺走视野
-      if (p.level === 'district' || p.level === 'town') showSpot(p, e.point, f);
-      else drillInto({ f });
+
+      if (p.level === 'province') {
+        // 点的正是当前省：交给内部图层处理；否则直接切到那个省
+        if (current.province && String(p.adcode) === String(current.province.properties.adcode)) return;
+        return drillProvince({ f });
+      }
+      if (p.level === 'city') return drillInto({ f });
+
+      // 区县 / 乡镇：进入该区域并显示所属
+      return drillInto({ f });
+    }
+
+    map.on('click', 'prov-fill', e => {
+      // 若点击处落在下级区域上，交给更内层处理，避免重复下钻
+      if (map.queryRenderedFeatures(e.point, { layers: ['detail-fill', 'context-fill'] }).length) return;
+      enterAt(e.features && e.features[0], e.point);
     });
+
+    map.on('click', 'context-fill', e => enterAt(e.features && e.features[0], e.point));
+    map.on('click', 'detail-fill', e => enterAt(e.features && e.features[0], e.point));
 
     /* 地图一移动就收起信息卡，保证拖动永远不被遮挡 */
     map.on('movestart dragstart zoomstart', () => { hideSpot(); hideTip(); });
@@ -1228,6 +1357,7 @@
           vec:  { type: 'raster', tiles: AMAP_STREET, tileSize: 256, maxzoom: 18 },
           prov:   { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
           focus:  { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
+          context: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
           detail: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } }
         },
         layers: [
