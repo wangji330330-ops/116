@@ -1,0 +1,578 @@
+[
+ {
+  "name": "中共三大会址纪念馆",
+  "city": "广州市",
+  "cityAdcode": "440100",
+  "district": "越秀区",
+  "districtAdcode": "440104",
+  "town": null,
+  "addr": "广州市越秀区恤孤院路3号"
+ },
+ {
+  "name": "广州起义烈士陵园",
+  "city": "广州市",
+  "cityAdcode": "440100",
+  "district": "越秀区",
+  "districtAdcode": "440104",
+  "town": null,
+  "addr": "广州市越秀区中山三路92号"
+ },
+ {
+  "name": "杨匏安故居",
+  "city": "广州市",
+  "cityAdcode": "440100",
+  "district": "越秀区",
+  "districtAdcode": "440104",
+  "town": null,
+  "addr": "广州市越秀区越华路116号"
+ },
+ {
+  "name": "中华全国总工会旧址",
+  "city": "广州市",
+  "cityAdcode": "440100",
+  "district": "越秀区",
+  "districtAdcode": "440104",
+  "town": "珠光街道",
+  "addr": "广州市越秀区珠光街道湛塘路社区越秀南路89号"
+ },
+ {
+  "name": "国民党\"一大\"旧址",
+  "city": "广州市",
+  "cityAdcode": "440100",
+  "district": "越秀区",
+  "districtAdcode": "440104",
+  "town": null,
+  "addr": "广州市越秀区文明路215号"
+ },
+ {
+  "name": "广州农民运动讲习所旧址（毛泽东同志主办农民运动讲习所旧址纪念馆）",
+  "city": "广州市",
+  "cityAdcode": "440100",
+  "district": "越秀区",
+  "districtAdcode": "440104",
+  "town": null,
+  "addr": "广州市越秀区中山四路42号"
+ },
+ {
+  "name": "广州公社旧址",
+  "city": "广州市",
+  "cityAdcode": "440100",
+  "district": null,
+  "districtAdcode": null,
+  "town": null,
+  "addr": "广州市起义路广州市公安局大院内"
+ },
+ {
+  "name": "广州起义纪念馆",
+  "city": "广州市",
+  "cityAdcode": "440100",
+  "district": "越秀区",
+  "districtAdcode": "440104",
+  "town": null,
+  "addr": "广州市越秀区起义路200号之一"
+ },
+ {
+  "name": "黄花岗七十二烈士陵园（黄花岗公园）",
+  "city": "广州市",
+  "cityAdcode": "440100",
+  "district": "越秀区",
+  "districtAdcode": "440104",
+  "town": null,
+  "addr": "广州市越秀区先烈中路79号黄花岗公园"
+ },
+ {
+  "name": "三元里人民抗英斗争纪念馆",
+  "city": "广州市",
+  "cityAdcode": "440100",
+  "district": "白云区",
+  "districtAdcode": "440111",
+  "town": null,
+  "addr": "广州市白云区广园中路34号"
+ },
+ {
+  "name": "中山纪念堂",
+  "city": "广州市",
+  "cityAdcode": "440100",
+  "district": "越秀区",
+  "districtAdcode": "440104",
+  "town": null,
+  "addr": "广州市越秀区东风中路299号"
+ },
+ {
+  "name": "广州大元帅府旧址（孙中山大元帅府纪念馆）",
+  "city": "广州市",
+  "cityAdcode": "440100",
+  "district": "海珠区",
+  "districtAdcode": "440105",
+  "town": null,
+  "addr": "广州市海珠区纺织路东沙街18号"
+ },
+ {
+  "name": "洪秀全故居",
+  "city": "广州市",
+  "cityAdcode": "440100",
+  "district": "花都区",
+  "districtAdcode": "440114",
+  "town": null,
+  "addr": "广州市花都区新华街新华路52号"
+ },
+ {
+  "name": "辛亥革命纪念馆",
+  "city": "广州市",
+  "cityAdcode": "440100",
+  "district": "黄埔区",
+  "districtAdcode": "440112",
+  "town": null,
+  "addr": "广州市黄埔区长洲岛金洲北路563号"
+ },
+ {
+  "name": "黄埔军校旧址（黄埔军校旧址纪念馆）",
+  "city": "广州市",
+  "cityAdcode": "440100",
+  "district": "黄埔区",
+  "districtAdcode": "440112",
+  "town": null,
+  "addr": "广州市黄埔区长洲岛军校路170号"
+ },
+ {
+  "name": "十九路军淞沪抗日阵亡将士陵园",
+  "city": "广州市",
+  "cityAdcode": "440100",
+  "district": "天河区",
+  "districtAdcode": "440106",
+  "town": null,
+  "addr": "广州市天河区水荫路113号"
+ },
+ {
+  "name": "广东省博物馆（广州鲁迅纪念馆）",
+  "city": "广州市",
+  "cityAdcode": "440100",
+  "district": "天河区",
+  "districtAdcode": "440106",
+  "town": null,
+  "addr": "广州市天河区珠江东路2号"
+ },
+ {
+  "name": "广东革命历史博物馆（广州近代史博物馆）",
+  "city": "广州市",
+  "cityAdcode": "440100",
+  "district": "越秀区",
+  "districtAdcode": "440104",
+  "town": null,
+  "addr": "广州市越秀区陵园西路2号大院2号"
+ },
+ {
+  "name": "星海园",
+  "city": "广州市",
+  "cityAdcode": "440100",
+  "district": "越秀区",
+  "districtAdcode": "440104",
+  "town": null,
+  "addr": "广州市越秀区麓湖北路19号"
+ },
+ {
+  "name": "邓世昌纪念馆（邓氏宗祠）",
+  "city": "广州市",
+  "cityAdcode": "440100",
+  "district": "海珠区",
+  "districtAdcode": "440105",
+  "town": null,
+  "addr": "广州市海珠区宝岗大道二龙街龙涎里2号"
+ },
+ {
+  "name": "冼星海纪念馆",
+  "city": "广州市",
+  "cityAdcode": "440100",
+  "district": "番禺区",
+  "districtAdcode": "440113",
+  "town": null,
+  "addr": "广州市番禺区大罗塘银平路121号番禺博物馆一楼"
+ },
+ {
+  "name": "东莞东江纵队纪念馆",
+  "city": "东莞市",
+  "cityAdcode": "441900",
+  "district": null,
+  "districtAdcode": null,
+  "town": "大岭山镇",
+  "addr": "东莞市大岭山镇大岭村纪念馆路1号"
+ },
+ {
+  "name": "大岭山抗日根据地旧址",
+  "city": "东莞市",
+  "cityAdcode": "441900",
+  "district": null,
+  "districtAdcode": null,
+  "town": "大岭山镇",
+  "addr": "东莞市大岭山镇大王岭村"
+ },
+ {
+  "name": "海战博物馆",
+  "city": "东莞市",
+  "cityAdcode": "441900",
+  "district": null,
+  "districtAdcode": null,
+  "town": "虎门镇",
+  "addr": "东莞市虎门镇环岛路威远炮台东侧"
+ },
+ {
+  "name": "深圳革命烈士陵园",
+  "city": "深圳市",
+  "cityAdcode": "440300",
+  "district": null,
+  "districtAdcode": null,
+  "town": null,
+  "addr": "深圳市北环大道和彩田路交汇处"
+ },
+ {
+  "name": "南三花工委旧址",
+  "city": "佛山市",
+  "cityAdcode": "440600",
+  "district": "南海区",
+  "districtAdcode": "440605",
+  "town": null,
+  "addr": "佛山市南海区沈五五巷1号"
+ },
+ {
+  "name": "大沥革命烈士纪念碑",
+  "city": "佛山市",
+  "cityAdcode": "440600",
+  "district": "南海区",
+  "districtAdcode": "440605",
+  "town": "大沥街道",
+  "addr": "佛山市南海区大沥街道大沥公园内"
+ },
+ {
+  "name": "粤中纵队纪念馆",
+  "city": "佛山市",
+  "cityAdcode": "440600",
+  "district": "高明区",
+  "districtAdcode": "440608",
+  "town": "更合镇",
+  "addr": "佛山市高明区更合镇"
+ },
+ {
+  "name": "铁军公园",
+  "city": "佛山市",
+  "cityAdcode": "440600",
+  "district": "禅城区",
+  "districtAdcode": "440604",
+  "town": null,
+  "addr": "佛山市禅城区汾江西路15号"
+ },
+ {
+  "name": "陈铁军故居",
+  "city": "佛山市",
+  "cityAdcode": "440600",
+  "district": "禅城区",
+  "districtAdcode": "440604",
+  "town": null,
+  "addr": "佛山市禅城区福宁路善庆坊6号"
+ },
+ {
+  "name": "东江人民革命烈士纪念碑",
+  "city": "惠州市",
+  "cityAdcode": "441300",
+  "district": "惠城区",
+  "districtAdcode": "441302",
+  "town": null,
+  "addr": "惠州市惠城区下角眉山路1号"
+ },
+ {
+  "name": "叶挺将军纪念园（叶挺纪念馆、叶挺故居）",
+  "city": "惠州市",
+  "cityAdcode": "441300",
+  "district": "惠阳区",
+  "districtAdcode": "441303",
+  "town": "秋长街道",
+  "addr": "惠州市惠阳区秋长街道周田村会水楼88号"
+ },
+ {
+  "name": "惠州东江纵队纪念馆",
+  "city": "惠州市",
+  "cityAdcode": "441300",
+  "district": "博罗县",
+  "districtAdcode": "441322",
+  "town": null,
+  "addr": "惠州市博罗县罗浮大道罗浮山景区"
+ },
+ {
+  "name": "白芒坑革命旧址",
+  "city": "惠州市",
+  "cityAdcode": "441300",
+  "district": "龙门县",
+  "districtAdcode": "441324",
+  "town": "平陵镇",
+  "addr": "惠州市龙门县平陵镇山下村委会"
+ },
+ {
+  "name": "邓演达故居（邓演达故居纪念馆）",
+  "city": "惠州市",
+  "cityAdcode": "441300",
+  "district": "惠城区",
+  "districtAdcode": "441302",
+  "town": "三栋镇",
+  "addr": "惠州市惠城区三栋镇鹿颈村"
+ },
+ {
+  "name": "高潭镇中洞革命老区遗址群",
+  "city": "惠州市",
+  "cityAdcode": "441300",
+  "district": "惠东县",
+  "districtAdcode": "441323",
+  "town": "高潭镇",
+  "addr": "惠州市惠东县高潭镇中洞村"
+ },
+ {
+  "name": "\"八一\"起义军三河坝战役纪念园",
+  "city": "梅州市",
+  "cityAdcode": "441400",
+  "district": "大埔县",
+  "districtAdcode": "441422",
+  "town": null,
+  "addr": "梅州市大埔县333省道与961县道交叉口西南50米"
+ },
+ {
+  "name": "东江第一次工农兵代表大会旧址",
+  "city": "梅州市",
+  "cityAdcode": "441400",
+  "district": "丰顺县",
+  "districtAdcode": "441423",
+  "town": "下八乡",
+  "addr": "梅州市丰顺县下八乡滩下庄屋坪村"
+ },
+ {
+  "name": "叶剑英纪念园（叶剑英故居）",
+  "city": "梅州市",
+  "cityAdcode": "441400",
+  "district": "梅县区",
+  "districtAdcode": "441403",
+  "town": "雁洋镇",
+  "addr": "梅州市梅县区雁洋镇虎形村"
+ },
+ {
+  "name": "丘逢甲故居",
+  "city": "梅州市",
+  "cityAdcode": "441400",
+  "district": "蕉岭县",
+  "districtAdcode": "441427",
+  "town": "文福镇",
+  "addr": "梅州市蕉岭县文福镇逢甲村（原淡定村）"
+ },
+ {
+  "name": "北伐战争纪念馆",
+  "city": "韶关市",
+  "cityAdcode": "440200",
+  "district": "浈江区",
+  "districtAdcode": "440204",
+  "town": null,
+  "addr": "韶关市浈江区五里亭良村公路四横巷4号"
+ },
+ {
+  "name": "南亩镇鱼鲜村红军标语",
+  "city": "韶关市",
+  "cityAdcode": "440200",
+  "district": "南雄市",
+  "districtAdcode": "440282",
+  "town": "南亩镇",
+  "addr": "韶关市南雄市南亩镇鱼鲜村"
+ },
+ {
+  "name": "南雄烈士陵园",
+  "city": "韶关市",
+  "cityAdcode": "440200",
+  "district": "南雄市",
+  "districtAdcode": "440282",
+  "town": null,
+  "addr": "韶关市南雄市五里山"
+ },
+ {
+  "name": "大塘镇红军标语",
+  "city": "韶关市",
+  "cityAdcode": "440200",
+  "district": "南雄市",
+  "districtAdcode": "440282",
+  "town": "大塘镇",
+  "addr": "韶关市南雄大塘镇"
+ },
+ {
+  "name": "梅岭镇红军标语",
+  "city": "韶关市",
+  "cityAdcode": "440200",
+  "district": "南雄市",
+  "districtAdcode": "440282",
+  "town": "梅岭镇",
+  "addr": "韶关市南雄市梅岭镇"
+ },
+ {
+  "name": "韶关市红军长征粤北纪念馆",
+  "city": "韶关市",
+  "cityAdcode": "440200",
+  "district": "仁化县",
+  "districtAdcode": "440224",
+  "town": "城口镇",
+  "addr": "韶关市仁化县城口镇"
+ },
+ {
+  "name": "粤桂湘边纵队纪念馆",
+  "city": "肇庆市",
+  "cityAdcode": "441200",
+  "district": "广宁县",
+  "districtAdcode": "441223",
+  "town": "南街镇",
+  "addr": "肇庆市广宁县南街镇环城西路广宁县博物馆内"
+ },
+ {
+  "name": "叶挺独立团团部旧址纪念馆",
+  "city": "肇庆市",
+  "cityAdcode": "441200",
+  "district": "端州区",
+  "districtAdcode": "441202",
+  "town": null,
+  "addr": "肇庆市端州区江滨东路"
+ },
+ {
+  "name": "周其鉴纪念馆",
+  "city": "肇庆市",
+  "cityAdcode": "441200",
+  "district": "广宁县",
+  "districtAdcode": "441223",
+  "town": null,
+  "addr": "肇庆市广宁县城东其鉴纪念中学内"
+ },
+ {
+  "name": "高要端源乡农民协会遗址",
+  "city": "肇庆市",
+  "cityAdcode": "441200",
+  "district": "高要区",
+  "districtAdcode": "441204",
+  "town": "市乐城镇",
+  "addr": "肇庆市高要市乐城镇领村的北面"
+ },
+ {
+  "name": "和平县革命烈士纪念碑",
+  "city": "河源市",
+  "cityAdcode": "441600",
+  "district": "和平县",
+  "districtAdcode": "441624",
+  "town": null,
+  "addr": "河源市和平县城南塔岗山顶上"
+ },
+ {
+  "name": "河源烈士陵园",
+  "city": "河源市",
+  "cityAdcode": "441600",
+  "district": "源城区",
+  "districtAdcode": "441602",
+  "town": null,
+  "addr": "河源市源城区公园路47号"
+ },
+ {
+  "name": "罗焕荣烈士故居",
+  "city": "河源市",
+  "cityAdcode": "441600",
+  "district": "源城区",
+  "districtAdcode": "441602",
+  "town": "埔前镇",
+  "addr": "河源市源城区埔前镇的上村村"
+ },
+ {
+  "name": "阮啸仙故居",
+  "city": "河源市",
+  "cityAdcode": "441600",
+  "district": "东源县",
+  "districtAdcode": "441625",
+  "town": "义合镇",
+  "addr": "河源市东源县义合镇下屯村"
+ },
+ {
+  "name": "红色审计爱国党建实践教学基地",
+  "city": "河源市",
+  "cityAdcode": "441600",
+  "district": "东源县",
+  "districtAdcode": "441625",
+  "town": "义合镇",
+  "addr": "河源市东源县义合镇下屯村"
+ },
+ {
+  "name": "海丰红宫红场旧址纪念馆",
+  "city": "汕尾市",
+  "cityAdcode": "441500",
+  "district": "海丰县",
+  "districtAdcode": "441521",
+  "town": "海城镇",
+  "addr": "汕尾市海丰县海城镇人民南路13号"
+ },
+ {
+  "name": "红二师碣石作战指挥部旧址",
+  "city": "汕尾市",
+  "cityAdcode": "441500",
+  "district": "陆丰市",
+  "districtAdcode": "441581",
+  "town": "碣石镇",
+  "addr": "汕尾市陆丰市碣石镇诗书社区玄武山旅游"
+ },
+ {
+  "name": "孙中山故居（孙中山故居纪念馆）",
+  "city": "中山市",
+  "cityAdcode": "442000",
+  "district": null,
+  "districtAdcode": null,
+  "town": "南朗镇",
+  "addr": "中山市南朗镇翠亨村"
+ },
+ {
+  "name": "杨殷故居",
+  "city": "中山市",
+  "cityAdcode": "442000",
+  "district": null,
+  "districtAdcode": null,
+  "town": "南朗街道",
+  "addr": "中山市南朗街道翠亨村"
+ },
+ {
+  "name": "辛亥革命纪念公园",
+  "city": "中山市",
+  "cityAdcode": "442000",
+  "district": null,
+  "districtAdcode": null,
+  "town": "南朗街道",
+  "addr": "中山市南朗街道翠亨村"
+ },
+ {
+  "name": "茂芝会议旧址",
+  "city": "潮州市",
+  "cityAdcode": "445100",
+  "district": "饶平县",
+  "districtAdcode": "445122",
+  "town": "上饶镇",
+  "addr": "潮州市饶平县上饶镇茂芝社区"
+ },
+ {
+  "name": "周恩来同志革命活动旧址（揭阳学宫）",
+  "city": "揭阳市",
+  "cityAdcode": "445200",
+  "district": "榕城区",
+  "districtAdcode": "445202",
+  "town": null,
+  "addr": "揭阳市榕城区韩祠路7号（韩祠路口东侧）"
+ },
+ {
+  "name": "周文雍陈铁军烈士陵园",
+  "city": "江门市",
+  "cityAdcode": "440700",
+  "district": "开平市",
+  "districtAdcode": "440783",
+  "town": null,
+  "addr": "江门市开平市广南线与仁兴大道交叉路口往东南约240米"
+ },
+ {
+  "name": "广东南路革命化州纪念馆",
+  "city": "茂名市",
+  "cityAdcode": "440900",
+  "district": "化州市",
+  "districtAdcode": "440982",
+  "town": null,
+  "addr": "茂名市化州市柑村"
+ }
+]

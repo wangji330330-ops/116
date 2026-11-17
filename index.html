@@ -55,10 +55,19 @@ window.addEventListener('unhandledrejection', function (e) {
   <!-- 右上：控件 -->
   <div class="hud hud--tools" data-ui>
     <button class="tool" id="btn-hide" title="隐藏界面，便于查看地图（快捷键 H）">隐藏界面</button>
+    <button class="tool" id="btn-3d" title="广东 3D 立体地图">3D</button>
     <button class="tool" id="btn-replay" title="重播开场">重播</button>
     <button class="tool" id="btn-basemap" title="切换底图">卫星图</button>
     <button class="tool" id="btn-panel" title="展开说明">说明</button>
     <button class="tool" id="btn-full" title="全屏">全屏</button>
+  </div>
+
+  <!-- 左上：搜索 -->
+  <div class="hud hud--search" data-ui>
+    <span class="search__ico">⌕</span>
+    <input id="q" type="search" autocomplete="off" placeholder="搜索红色场馆 / 市 / 区县" aria-label="搜索" />
+    <button class="search__clear" id="q-clear" aria-label="清除">×</button>
+    <div class="qs" id="qs" hidden></div>
   </div>
 
   <!-- 左下：面包屑 + 展开进度 -->

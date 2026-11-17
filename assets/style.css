@@ -483,6 +483,96 @@ body.lbl-compact .pin--prov .pin__name { font-size: 10.5px; }
 .toast.is-on { opacity: 1; transform: translate(-50%, 0); }
 .toast .t-hi { color: var(--gold-lite); font-weight: 700; }
 
+/* ================= 左上 · 搜索 ================= */
+.hud--search {
+  top: calc(max(16px, env(safe-area-inset-top)) + 72px);
+  left: 16px;
+  width: min(300px, calc(100vw - 32px));
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 10px;
+  z-index: 12;
+}
+.search__ico { color: var(--gold); font-size: 15px; line-height: 1; flex: none; }
+.hud--search input {
+  flex: 1; min-width: 0;
+  appearance: none; border: 0; outline: 0; background: transparent;
+  font-family: var(--font); font-size: 12.5px; color: var(--ink);
+  padding: 4px 0;
+}
+.hud--search input::placeholder { color: var(--ink-3); }
+.search__clear {
+  appearance: none; border: 0; background: none; cursor: pointer;
+  color: var(--ink-3); font-size: 15px; line-height: 1; padding: 0 2px;
+  visibility: hidden;
+}
+.hud--search.has-q .search__clear { visibility: visible; }
+
+.qs {
+  position: absolute; left: 0; right: 0; top: calc(100% + 6px);
+  max-height: min(52vh, 420px); overflow-y: auto;
+  background: rgba(253, 252, 249, .99);
+  border: 1px solid rgba(201, 162, 39, .34);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg);
+  padding: 4px;
+}
+.qs__item {
+  display: block; width: 100%; text-align: left;
+  appearance: none; border: 0; background: none; cursor: pointer;
+  padding: 7px 9px; border-radius: 7px;
+  font-family: var(--font); color: var(--ink-2);
+}
+.qs__item:hover, .qs__item.is-active { background: rgba(200, 16, 46, .08); }
+.qs__t { font-size: 12.5px; font-weight: 600; color: var(--ink); display: block; }
+.qs__p { font-size: 10.5px; color: var(--ink-3); display: block; margin-top: 1px; }
+.qs__empty { padding: 10px; font-size: 12px; color: var(--ink-3); text-align: center; }
+.qs__hd {
+  font-size: 10px; color: var(--gold); font-weight: 700; letter-spacing: 1.5px;
+  padding: 7px 9px 3px;
+}
+
+/* ================= 说明面板 · 红色场馆层级树 ================= */
+.tree { font-size: 12px; }
+.tree details { margin: 2px 0; }
+.tree summary {
+  cursor: pointer; list-style: none; padding: 4px 6px; border-radius: 6px;
+  display: flex; align-items: baseline; gap: 6px;
+  color: var(--ink); font-weight: 600;
+}
+.tree summary::-webkit-details-marker { display: none; }
+.tree summary::before {
+  content: "▸"; color: var(--gold); font-size: 9px; flex: none;
+  transition: transform .18s; display: inline-block;
+}
+.tree details[open] > summary::before { transform: rotate(90deg); }
+.tree summary:hover { background: rgba(200, 16, 46, .06); }
+.tree .n-count {
+  color: var(--ink-3); font-weight: 400; font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+.tree ul { list-style: none; margin: 0; padding-left: 14px; }
+.tree li { padding: 3px 0 3px 6px; line-height: 1.5; }
+.tree li button {
+  appearance: none; border: 0; background: none; padding: 2px 4px; margin: 0 -4px;
+  font: inherit; color: var(--ink-2); cursor: pointer; text-align: left; border-radius: 5px;
+}
+.tree li button:hover { background: rgba(200, 16, 46, .08); color: var(--red); }
+.tree .s-addr { display: block; font-size: 10.5px; color: var(--ink-3); }
+.tree .lv1 > summary { font-size: 13px; color: var(--red-deep); }
+.tree .lv2 > summary { font-size: 12.5px; }
+.tree .lv3 > summary { font-size: 12px; color: var(--ink-2); }
+.tree .lv4 > summary { font-size: 11.5px; color: var(--ink-2); font-weight: 500; }
+.tree mark { background: rgba(201, 162, 39, .35); color: inherit; padding: 0 1px; border-radius: 2px; }
+
+.panel__search {
+  width: 100%; box-sizing: border-box;
+  appearance: none; border: 1px solid rgba(201, 162, 39, .45);
+  background: #fff; border-radius: 8px;
+  padding: 8px 11px; margin-bottom: 12px;
+  font-family: var(--font); font-size: 12.5px; color: var(--ink);
+}
+.panel__search:focus { outline: 0; border-color: var(--red); }
+
 /* ================= 隐藏界面（沉浸看图） ================= */
 #app.ui-hidden [data-ui] {
   opacity: 0;

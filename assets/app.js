@@ -634,19 +634,32 @@
 
     selectDetail(p.adcode);
 
-    // 进入区县：聚焦 + 适度拉近，并保留兄弟区县可继续点击
+    // 进入区县：聚焦 + 适度拉近
     if (p.level === 'district' || p.level === 'town') {
       demotePins();
       setFocus([f]);
-      setDetail([]);
+
+      /* 跨级可点：
+         ① 本市的其余区县保持在 detail 图层里 → 可点同级
+         ② 本省的全部市放进 context 图层 → 可直接跨到别的市
+         ③ 其余省份由 prov 图层承接 → 可直接跨到别的省 */
+      const cityKids = current.city
+        ? await loadChildren(current.city.properties.adcode) : [];
+      setDetail(cityKids);
+      cityKids.forEach(k => setState('detail', k.properties.adcode, { reveal: 1 }));
       selectDetail(p.adcode);
-      siblingsOf(f).then(list => { setContext(list); });
+
+      if (current.province) {
+        const provKids = await loadChildren(current.province.properties.adcode);
+        setContext(provKids);
+      }
+
       fitFeature([f], { maxZoom: 11, padding: 120, duration: 780 });
       updateCrumb();
       els.pgLabel.textContent = `${p.name} · 县级行政区`;
       els.pgCount.textContent = '';
       els.pgBar.style.width = '100%';
-      els.pgBasis.textContent = '点击周边区县可直接切换 · 拖动地图浏览';
+      els.pgBasis.textContent = '点击周边区县或任意城市可直接切换 · 拖动地图浏览';
       showSpot(p, null, f);
       return;
     }
@@ -970,9 +983,244 @@
     box.hidden = false;
   }
 
+  /* ============================ 红色场馆定位 ============================ */
+  const sleepMs = ms => new Promise(r => setTimeout(r, ms));
+
+  /* 依次：广东省 → 所在市 → 所在区县，最后弹出该场馆卡片 */
+  async function gotoRedSite(name) {
+    const site = RED_SITES.find(s => s.name === name);
+    if (!site || !countryFC) return;
+    hideSpot();
+    closePanelIfCompact();
+
+    const prov = countryFC.features.find(f => f.properties.name === '广东省');
+    if (!prov) return;
+
+    if (!current.province || current.province.properties.name !== '广东省') {
+      drillProvince({ f: prov });
+      await sleepMs(1400);
+    }
+
+    const provKids = await loadChildren(prov.properties.adcode);
+    const city = provKids.find(x => String(x.properties.adcode) === String(site.cityAdcode));
+    if (city) {
+      drillInto({ f: city });
+      await sleepMs(1500);
+    }
+
+    if (site.districtAdcode) {
+      const cityKids = await loadChildren(site.cityAdcode);
+      const dist = cityKids.find(x => String(x.properties.adcode) === String(site.districtAdcode));
+      if (dist) {
+        drillInto({ f: dist });
+        await sleepMs(1600);
+      }
+    }
+
+    toast(`已定位：<b class="t-hi">${esc(site.name)}</b><br>${esc(site.addr)}`, 5200);
+  }
+
+  function closePanelIfCompact() {
+    if (window.innerWidth < 860) closePanel();
+  }
+
+  /* ============================ 地图搜索框 ============================ */
+  function setupSearch() {
+    const box = document.querySelector('.hud--search');
+    const input = document.getElementById('q');
+    const drop = document.getElementById('qs');
+    const clear = document.getElementById('q-clear');
+    if (!box || !input || !drop) return;
+
+    let items = [];
+    let active = -1;
+
+    function close() { drop.hidden = true; drop.innerHTML = ''; active = -1; }
+
+    function paint() {
+      input.parentElement.classList.toggle('has-q', !!input.value);
+      if (!items.length) {
+        drop.innerHTML = input.value.trim()
+          ? '<div class="qs__empty">没有找到匹配项</div>' : '';
+        drop.hidden = !input.value.trim();
+        return;
+      }
+      drop.innerHTML =
+        '<div class="qs__hd">红色场馆</div>' +
+        items.map((it, i) => `<button class="qs__item${i === active ? ' is-active' : ''}" data-i="${i}">
+            <span class="qs__t">${hl(it.name, input.value.trim())}</span>
+            <span class="qs__p">${esc(it.city)}${it.district ? ' · ' + esc(it.district) : ''}${it.town ? ' · ' + esc(it.town) : ''}</span>
+          </button>`).join('');
+      drop.hidden = false;
+    }
+
+    function search(q) {
+      const s = q.trim().toLowerCase();
+      if (!s) { items = []; active = -1; close(); input.parentElement.classList.remove('has-q'); return; }
+      items = RED_SITES
+        .filter(x => `${x.name} ${x.addr} ${x.city} ${x.district || ''} ${x.town || ''}`.toLowerCase().includes(s))
+        .slice(0, 12);
+      active = -1;
+      paint();
+    }
+
+    input.addEventListener('input', () => search(input.value));
+    input.addEventListener('focus', () => { if (input.value.trim()) search(input.value); });
+    clear.addEventListener('click', () => { input.value = ''; search(''); input.focus(); });
+
+    drop.addEventListener('click', ev => {
+      const b = ev.target.closest('.qs__item');
+      if (!b) return;
+      const it = items[+b.dataset.i];
+      if (it) { input.value = ''; search(''); input.blur(); gotoRedSite(it.name); }
+    });
+
+    input.addEventListener('keydown', ev => {
+      if (ev.key === 'Escape') { input.value = ''; search(''); input.blur(); return; }
+      if (!items.length) return;
+      if (ev.key === 'ArrowDown') { ev.preventDefault(); active = Math.min(items.length - 1, active + 1); paint(); }
+      if (ev.key === 'ArrowUp') { ev.preventDefault(); active = Math.max(0, active - 1); paint(); }
+      if (ev.key === 'Enter') {
+        ev.preventDefault();
+        const it = items[active >= 0 ? active : 0];
+        if (it) { input.value = ''; search(''); input.blur(); gotoRedSite(it.name); }
+      }
+    });
+
+    document.addEventListener('click', ev => { if (!box.contains(ev.target)) close(); });
+  }
+
+  /* ============================ 广东 3D 立体 ============================ */
+  let is3D = false;
+
+  function redCountByCity() {
+    const m = new Map();
+    RED_SITES.forEach(s => {
+      if (!s.cityAdcode) return;
+      m.set(String(s.cityAdcode), (m.get(String(s.cityAdcode)) || 0) + 1);
+    });
+    return m;
+  }
+
+  async function toggle3D(force) {
+    const on = force != null ? force : !is3D;
+    is3D = on;
+    const btn = document.getElementById('btn-3d');
+    if (btn) btn.classList.toggle('is-on', on);
+
+    if (!on) {
+      if (map.getLayer('city-3d')) map.setLayoutProperty('city-3d', 'visibility', 'none');
+      map.easeTo({ pitch: 0, bearing: 0, duration: 700 });
+      setTimeout(() => { try { map.setMaxPitch(0); } catch (_) {} }, 900);
+      return;
+    }
+
+    // 进入广东省
+    const prov = countryFC && countryFC.features.find(f => f.properties.name === '广东省');
+    if (!prov) return;
+    const cities = await loadChildren(prov.properties.adcode);
+    if (!cities.length) return;
+
+    const counts = redCountByCity();
+    const fc = {
+      type: 'FeatureCollection',
+      features: cities.map(f => ({
+        ...f,
+        properties: { ...f.properties, red: counts.get(String(f.properties.adcode)) || 0 }
+      }))
+    };
+
+    if (map.getSource('city3d')) {
+      map.getSource('city3d').setData(fc);
+    } else {
+      map.addSource('city3d', { type: 'geojson', data: fc });
+      map.addLayer({
+        id: 'city-3d', type: 'fill-extrusion', source: 'city3d',
+        paint: {
+          'fill-extrusion-color': ['interpolate', ['linear'], ['get', 'red'],
+            0, '#e8c86a', 3, '#e8576b', 10, '#c8102e', 22, '#8c0a20'],
+          'fill-extrusion-height': ['+', 8000, ['*', ['get', 'red'], 7000]],
+          'fill-extrusion-base': 0,
+          'fill-extrusion-opacity': 0.82
+        }
+      });
+    }
+    map.setLayoutProperty('city-3d', 'visibility', 'visible');
+
+    if (!current.province || current.province.properties.name !== '广东省') {
+      drillProvince({ f: prov });
+      await sleepMs(1400);
+    }
+    // 平时锁死俯仰，进入 3D 时才临时放开
+    try { map.setMaxPitch(70); } catch (_) {}
+    map.easeTo({ pitch: 52, bearing: -18, duration: 1200 });
+    toast('广东 <b class="t-hi">3D 立体地图</b>：柱体高度 = 该市收录的红色场馆数量', 4600);
+  }
+
   /* ============================ 说明面板 ============================ */
+  /* ---------- 红色场馆：省 › 市 › 区县 › 乡镇 四级树 ---------- */
+  function buildRedTree() {
+    const root = { name: '广东省', depth: 1, children: new Map(), sites: [] };
+    const ensure = (map, key, depth) => {
+      if (!map.has(key)) map.set(key, { name: key, depth, children: new Map(), sites: [] });
+      return map.get(key);
+    };
+    RED_SITES.forEach(s => {
+      const city = ensure(root.children, s.city || '其他', 2);
+      if (!s.district) { city.sites.push(s); return; }
+      const dist = ensure(city.children, s.district, 3);
+      if (!s.town) { dist.sites.push(s); return; }
+      ensure(dist.children, s.town, 4).sites.push(s);
+    });
+    return root;
+  }
+
+  function countOf(node) {
+    let n = node.sites.length;
+    for (const c of node.children.values()) n += countOf(c);
+    return n;
+  }
+
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  function hl(text, q) {
+    const t = esc(text);
+    if (!q) return t;
+    const i = text.toLowerCase().indexOf(q.toLowerCase());
+    if (i < 0) return t;
+    return esc(text.slice(0, i)) + '<mark>' + esc(text.slice(i, i + q.length)) + '</mark>' + esc(text.slice(i + q.length));
+  }
+
+  function siteMatches(s, q) {
+    if (!q) return true;
+    const hay = `${s.name} ${s.addr} ${s.city} ${s.district || ''} ${s.town || ''}`.toLowerCase();
+    return hay.includes(q.toLowerCase());
+  }
+
+  function renderNode(node, q) {
+    const kids = [...node.children.values()]
+      .map(c => renderNode(c, q))
+      .filter(Boolean);
+
+    const own = node.sites.filter(s => siteMatches(s, q));
+    if (q && !kids.length && !own.length) return '';
+
+    const total = countOf(node);
+    const head = `<summary><span>${hl(node.name, q)}</span><span class="n-count">${total}</span></summary>`;
+    const list = own.length
+      ? `<ul>${own.map(s => `<li><button data-site="${esc(s.name)}">${hl(s.name, q)}<span class="s-addr">${esc(s.addr)}</span></button></li>`).join('')}</ul>`
+      : '';
+    const open = q ? ' open' : (node.depth <= 2 ? ' open' : '');
+    return `<details${open} class="lv${node.depth}">${head}${kids.join('')}${list}</details>`;
+  }
+
+  function renderTree(q) {
+    const box = document.getElementById('red-tree');
+    if (!box) return;
+    const tree = buildRedTree();
+    box.innerHTML = renderNode(tree, q || '') || '<p style="color:#86868b">没有匹配的场馆</p>';
+  }
   function buildAbout() {
-    const cityCount = new Set(RED_SITES.map(s => s.city)).size;
     return `
       <h3>作品主题</h3>
       <p><strong>数绘湾区红脉 · 践行医者初心</strong>——以国家标准公开版地图为底图，
@@ -984,8 +1232,8 @@
         <li><strong>地球开场</strong>：卫星地球自动飞入中国疆域；</li>
         <li><strong>逐级高亮</strong>：点选省份即整幅高亮，其余省份淡出；</li>
         <li><strong>省会领跑</strong>：每级先展开省会 / 市政府所在地，其余依次淡入；</li>
-        <li><strong>横向切换</strong>：上一层级的标记与同级区域常驻可点，随时跳到别处；</li>
-        <li><strong>下钻到乡镇</strong>：接入高德行政区划服务后可继续展开街道 / 镇 / 乡。</li>
+        <li><strong>跨级可点</strong>：上一层级的标记、同级的市与区县都常驻可点，随时跳到任意层级；</li>
+        <li><strong>红色资源检索</strong>：左上角搜索框可直达任意场馆，说明面板按「省 › 市 › 区县 › 乡镇」分层列出。</li>
       </ul>
 
       <h3>核心机制</h3>
@@ -1016,8 +1264,9 @@
         以及南海诸岛与十段线，不存在任何形式的「问题地图」表述。
       </div>
 
-      <h3>红色场馆名录（${RED_SITES.length} 处 · ${cityCount} 个地市）</h3>
-      <div id="red-list"></div>
+      <h3>红色场馆名录（${RED_SITES.length} 处 · 按省 › 市 › 区县 › 乡镇 分层）</h3>
+      <input class="panel__search" id="tree-q" type="search" placeholder="在名录中搜索场馆…" autocomplete="off" />
+      <div class="tree" id="red-tree"></div>
     `;
   }
 
@@ -1028,15 +1277,20 @@
     els.panel.setAttribute('aria-hidden', 'false');
     els.panelBody.scrollTop = 0;
 
-    const list = $('red-list');
-    if (list) {
-      const byCity = {};
-      RED_SITES.forEach(s => (byCity[s.city] = byCity[s.city] || []).push(s));
-      list.innerHTML = Object.entries(byCity).map(([city, arr]) => `
-        <h3>${city}（${arr.length}）</h3>
-        <ul>${arr.map(s => `<li><strong>${s.name}</strong><br>
-          <span style="font-size:11px;color:#86868b">${s.addr}</span></li>`).join('')}</ul>`).join('');
+    renderTree('');
+
+    const tq = $('tree-q');
+    if (tq) {
+      let t = 0;
+      tq.addEventListener('input', () => {
+        clearTimeout(t);
+        t = setTimeout(() => renderTree(tq.value.trim()), 130);
+      });
     }
+    els.panelBody.addEventListener('click', ev => {
+      const btn = ev.target.closest('button[data-site]');
+      if (btn) gotoRedSite(btn.dataset.site);
+    });
   }
 
   /* ============================ 底图切换 ============================ */
@@ -1113,6 +1367,8 @@
     document.getElementById('btn-panel').onclick = openPanel;
     document.getElementById('panel-close').onclick = closePanel;
     document.getElementById('spot-close').onclick = hideSpot;
+    document.getElementById('btn-3d').onclick = () => toggle3D();
+    setupSearch();
 
     window.addEventListener('keydown', ev => {
       if (ev.key === 'Escape') {
@@ -1367,6 +1623,19 @@
         setTimeout(initApp, 1500);
         return;
       }
+
+      // 场馆补全区县 / 乡镇归属（失败不影响主流程）
+      try {
+        const res = await (await fetch('./data/red-sites.resolved.json')).json();
+        res.forEach(r => {
+          const s = RED_SITES.find(x => x.name === r.name);
+          if (!s) return;
+          s.cityAdcode = r.cityAdcode;
+          s.district = r.district;
+          s.districtAdcode = r.districtAdcode;
+          s.town = r.town;
+        });
+      } catch (_) {}
 
       addOverlayLayers();
       applyBasemap(true);
