@@ -1680,22 +1680,28 @@
 
   function applyBasemap(force) {
     if (!map.getLayer('sat')) return;
-    const z = map.getZoom();
-    let sat;
-    if (baseMode === 'sat') sat = true;
-    else if (baseMode === 'vec') sat = false;
-    else sat = z < 3.15;
+    const mode = baseMode;
+    if (!force && mode === baseApplied) return;
+    baseApplied = mode;
 
-    const key = String(sat);
-    if (!force && key === baseApplied) return;
-    baseApplied = key;
-
-    map.setLayoutProperty('sat', 'visibility', sat ? 'visible' : 'none');
-    map.setLayoutProperty('vec', 'visibility', sat ? 'none' : 'visible');
+    map.setLayoutProperty('sat', 'visibility', mode === 'sat' ? 'visible' : 'none');
+    map.setLayoutProperty('vec', 'visibility', mode === 'vec' ? 'visible' : 'none');
+    if (map.getLayer('gdstd')) {
+      map.setLayoutProperty('gdstd', 'visibility', mode === 'std' ? 'visible' : 'none');
+    }
+    const sat = mode !== 'vec';
 
     /* 卫星模式下地块几乎透明，让影像透出来；标准图模式下用暖纸色铺底 */
     try {
-      if (sat) {
+      if (baseMode === 'std') {
+        map.setPaintProperty('prov-fill', 'fill-opacity', ['case',
+          ['boolean', ['feature-state', 'dim'], false], 0.0,
+          ['boolean', ['feature-state', 'selected'], false], 0.0,
+          ['boolean', ['feature-state', 'hover'], false], 0.06, 0.0]);
+        map.setPaintProperty('detail-fill', 'fill-opacity', ['case',
+          ['boolean', ['feature-state', 'selected'], false], 0.10,
+          ['*', ['coalesce', ['feature-state', 'reveal'], 0], 0.06]]);
+      } else if (sat) {
         map.setPaintProperty('prov-fill', 'fill-opacity', ['case',
           ['boolean', ['feature-state', 'dim'], false], 0.02,
           ['boolean', ['feature-state', 'selected'], false], 0.14,
@@ -1762,17 +1768,24 @@
     const btnReplay = document.getElementById('btn-replay');
     if (btnReplay) btnReplay.onclick = () => { resetToChina({ animate: false }).then(intro); };
     const btnBase = document.getElementById('btn-basemap');
+    const CYCLE = { sat: 'vec', vec: 'std', std: 'sat' };
+    const NEXT_LABEL = { sat: '卫', vec: '标', std: '粤' };   /* 显示「点一下会切到哪个」 */
     const syncBaseBtn = () => {
-      const sat = baseMode === 'sat';
-      btnBase.classList.toggle('is-on', sat);
-      btnBase.textContent = sat ? '标' : '卫';
-      btnBase.title = sat ? '当前为卫星影像，点击切换标准底图' : '当前为标准底图，点击切换卫星影像';
+      const nxt = CYCLE[baseMode];
+      btnBase.classList.toggle('is-on', baseMode === 'sat');
+      btnBase.textContent = NEXT_LABEL[nxt];
+      btnBase.title = {
+        sat: '当前为卫星影像，点击切换标准底图',
+        vec: '当前为标准底图，点击切换广东省标准地图',
+        std: '当前为广东省标准地图（粤S(2023)049号），点击切换卫星影像'
+      }[baseMode];
     };
-    syncBaseBtn();          /* 默认卫星影像，按钮起始显示「标」 */
+    syncBaseBtn();
     btnBase.onclick = () => {
-      baseMode = baseMode === 'vec' ? 'sat' : 'vec';
+      baseMode = CYCLE[baseMode] || 'sat';
       syncBaseBtn();
       applyBasemap(true);
+      if (baseMode === 'std') toast('底图为<b class="t-hi">广东省标准地图</b>　审图号 粤S（2023）049号', 4200);
     };
     document.getElementById('btn-panel').onclick = openPanel;
     document.getElementById('panel-close').onclick = closePanel;
@@ -1999,6 +2012,10 @@
           sat:  { type: 'raster', tiles: AMAP_SAT, tileSize: 256, maxzoom: 18,
                   attribution: '底图 © 高德地图 | 界线 © DataV.GeoAtlas' },
           vec:  { type: 'raster', tiles: AMAP_STREET, tileSize: 256, maxzoom: 18 },
+          /* 广东省标准地图（粤S(2023)049号）按经纬度配准后贴到地图上 */
+          gdstd: { type: 'image', url: './data/gd-standard.png',
+                   coordinates: [[109.53166, 25.33561], [117.29671, 25.33561],
+                                 [117.29671, 20.10651], [109.53166, 20.10651]] },
           prov:   { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
           focus:  { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
           redfocus: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
@@ -2015,7 +2032,11 @@
           { id: 'vec', type: 'raster', source: 'vec',
             layout: { visibility: 'none' },
             paint: { 'raster-opacity': 0.58, 'raster-fade-duration': 0,
-                     'raster-saturation': -0.42, 'raster-contrast': -0.04 } }
+                     'raster-saturation': -0.42, 'raster-contrast': -0.04 } },
+          { id: 'gdstd', type: 'raster', source: 'gdstd',
+            layout: { visibility: 'none' },
+            paint: { 'raster-opacity': 0.72, 'raster-fade-duration': 0,
+                     'raster-saturation': -0.25 } }
         ]
       },
       center: [104.6, 33],
