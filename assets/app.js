@@ -1737,6 +1737,13 @@
 
     /* 卫星模式下地块几乎透明，让影像透出来；标准图模式下用暖纸色铺底 */
     try {
+      /* 标准地图自带完整行政界线，再叠我们的矢量线会出现两条线打架，故隐藏矢量界线 */
+      const lineIds = ['prov-line', 'detail-line', 'context-line', 'focus-line'];
+      lineIds.forEach(id => {
+        if (!map.getLayer(id)) return;
+        map.setLayoutProperty(id, 'visibility', baseMode === 'std' ? 'none' : 'visible');
+      });
+
       if (baseMode === 'std') {
         map.setPaintProperty('prov-fill', 'fill-opacity', ['case',
           ['boolean', ['feature-state', 'dim'], false], 0.0,
@@ -2058,8 +2065,8 @@
           vec:  { type: 'raster', tiles: AMAP_STREET, tileSize: 256, maxzoom: 18 },
           /* 广东省标准地图（粤S（2020）103号）按经纬度配准后贴到地图上 */
           gdstd: { type: 'image', url: (window.__GDSTD || './data/gd-standard.png'),
-                   coordinates: [[109.57827, 25.62349], [117.31807, 25.62349],
-                                 [117.31807, 20.04018], [109.57827, 20.04018]] },
+                   coordinates: [[109.59053, 25.61933], [117.29940, 25.61942],
+                                 [117.30030, 19.98549], [109.59062, 19.98406]] },
           prov:   { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
           focus:  { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
           redfocus: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
