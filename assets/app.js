@@ -1674,8 +1674,8 @@
   }
 
   /* ============================ 底图切换 ============================ */
-  /* auto：球面阶段用卫星影像，落地后自动切标准图（高德标准图 z<3 为空白） */
-  let baseMode = 'auto';
+  /* 默认卫星影像；可在右上角切为标准图 */
+  let baseMode = 'sat';
   let baseApplied = null;
 
   function applyBasemap(force) {
@@ -1692,6 +1692,27 @@
 
     map.setLayoutProperty('sat', 'visibility', sat ? 'visible' : 'none');
     map.setLayoutProperty('vec', 'visibility', sat ? 'none' : 'visible');
+
+    /* 卫星模式下地块几乎透明，让影像透出来；标准图模式下用暖纸色铺底 */
+    try {
+      if (sat) {
+        map.setPaintProperty('prov-fill', 'fill-opacity', ['case',
+          ['boolean', ['feature-state', 'dim'], false], 0.02,
+          ['boolean', ['feature-state', 'selected'], false], 0.14,
+          ['boolean', ['feature-state', 'hover'], false], 0.12, 0.04]);
+        map.setPaintProperty('detail-fill', 'fill-opacity', ['case',
+          ['boolean', ['feature-state', 'selected'], false], 0.20,
+          ['*', ['coalesce', ['feature-state', 'reveal'], 0], 0.14]]);
+      } else {
+        map.setPaintProperty('prov-fill', 'fill-opacity', ['case',
+          ['boolean', ['feature-state', 'dim'], false], 0.20,
+          ['boolean', ['feature-state', 'selected'], false], 0.66,
+          ['boolean', ['feature-state', 'hover'], false], 0.50, 0.26]);
+        map.setPaintProperty('detail-fill', 'fill-opacity', ['case',
+          ['boolean', ['feature-state', 'selected'], false], 0.46,
+          ['*', ['coalesce', ['feature-state', 'reveal'], 0], 0.40]]);
+      }
+    } catch (_) {}
   }
 
   /* ============================ UI 绑定 ============================ */
@@ -1738,12 +1759,19 @@
       setTimeout(() => { map.resize(); scheduleDeclutter(); }, 260);
     });
 
-    document.getElementById('btn-replay').onclick = () => { resetToChina({ animate: false }).then(intro); };
-    document.getElementById('btn-basemap').onclick = ev => {
+    const btnReplay = document.getElementById('btn-replay');
+    if (btnReplay) btnReplay.onclick = () => { resetToChina({ animate: false }).then(intro); };
+    const btnBase = document.getElementById('btn-basemap');
+    const syncBaseBtn = () => {
+      const sat = baseMode === 'sat';
+      btnBase.classList.toggle('is-on', sat);
+      btnBase.textContent = sat ? '标' : '卫';
+      btnBase.title = sat ? '当前为卫星影像，点击切换标准底图' : '当前为标准底图，点击切换卫星影像';
+    };
+    syncBaseBtn();          /* 默认卫星影像，按钮起始显示「标」 */
+    btnBase.onclick = () => {
       baseMode = baseMode === 'vec' ? 'sat' : 'vec';
-      ev.currentTarget.classList.toggle('is-on', baseMode === 'sat');
-      ev.currentTarget.textContent = baseMode === 'sat' ? '标' : '卫';
-      ev.currentTarget.title = baseMode === 'sat' ? '当前为卫星图，点击切换标准图' : '当前为标准图，点击切换卫星图';
+      syncBaseBtn();
       applyBasemap(true);
     };
     document.getElementById('btn-panel').onclick = openPanel;
