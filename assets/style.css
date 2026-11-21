@@ -896,3 +896,30 @@ body.lbl-compact .pin--prov .pin__name { font-size: 10.5px; }
     right: 10px;
   }
 }
+
+
+/* 作品名（红脉岭南）+ 副题 */
+.titles .h1-name {
+  font-size: 21px;
+  letter-spacing: 2px;
+  color: var(--red-deep);
+}
+.titles .h1-name em {
+  font-style: normal;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: .5px;
+  color: var(--ink-3);
+  margin-left: 10px;
+}
+.titles .h1-sub {
+  margin: 2px 0 0;
+  font-size: 10.5px;
+  letter-spacing: .3px;
+  color: var(--ink-3);
+}
+@media (max-width: 640px) {
+  .titles .h1-name { font-size: 16px; letter-spacing: 1px; }
+  .titles .h1-name em { display: block; margin: 1px 0 0; font-size: 10px; }
+  .titles .h1-sub { font-size: 9.5px; }
+}
