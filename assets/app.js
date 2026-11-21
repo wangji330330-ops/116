@@ -1674,8 +1674,8 @@
   }
 
   /* ============================ 底图切换 ============================ */
-  /* 默认卫星影像；可在右上角切为标准图 */
-  let baseMode = 'sat';
+  /* 默认广东省标准地图；右上角可切标准底图 / 卫星影像 */
+  let baseMode = 'std';
   let baseApplied = null;
 
   function applyBasemap(force) {
@@ -1777,7 +1777,7 @@
       btnBase.title = {
         sat: '当前为卫星影像，点击切换标准底图',
         vec: '当前为标准底图，点击切换广东省标准地图',
-        std: '当前为广东省标准地图（粤S(2023)049号），点击切换卫星影像'
+        std: '当前为广东省标准地图（粤S（2020）103号），点击切换卫星影像'
       }[baseMode];
     };
     syncBaseBtn();
@@ -1785,7 +1785,7 @@
       baseMode = CYCLE[baseMode] || 'sat';
       syncBaseBtn();
       applyBasemap(true);
-      if (baseMode === 'std') toast('底图为<b class="t-hi">广东省标准地图</b>　审图号 粤S（2023）049号', 4200);
+      if (baseMode === 'std') toast('底图为<b class="t-hi">广东省标准地图</b>　审图号 粤S（2020）103号', 4200);
     };
     document.getElementById('btn-panel').onclick = openPanel;
     document.getElementById('panel-close').onclick = closePanel;
@@ -2010,12 +2010,12 @@
         projection: { type: 'globe' },
         sources: {
           sat:  { type: 'raster', tiles: AMAP_SAT, tileSize: 256, maxzoom: 18,
-                  attribution: '底图 © 高德地图 | 标准地图 粤S(2023)049号 | 界线 © DataV.GeoAtlas' },
+                  attribution: '底图 © 高德地图 | 标准地图 粤S（2020）103号 | 界线 © DataV.GeoAtlas' },
           vec:  { type: 'raster', tiles: AMAP_STREET, tileSize: 256, maxzoom: 18 },
-          /* 广东省标准地图（粤S(2023)049号）按经纬度配准后贴到地图上 */
-          gdstd: { type: 'image', url: './data/gd-standard.png',
-                   coordinates: [[109.53166, 25.33561], [117.29671, 25.33561],
-                                 [117.29671, 20.10651], [109.53166, 20.10651]] },
+          /* 广东省标准地图（粤S（2020）103号）按经纬度配准后贴到地图上 */
+          gdstd: { type: 'image', url: (window.__GDSTD || './data/gd-standard.png'),
+                   coordinates: [[109.57827, 25.62349], [117.31807, 25.62349],
+                                 [117.31807, 20.04018], [109.57827, 20.04018]] },
           prov:   { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
           focus:  { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
           redfocus: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
@@ -2035,8 +2035,7 @@
                      'raster-saturation': -0.42, 'raster-contrast': -0.04 } },
           { id: 'gdstd', type: 'raster', source: 'gdstd',
             layout: { visibility: 'none' },
-            paint: { 'raster-opacity': 0.72, 'raster-fade-duration': 0,
-                     'raster-saturation': -0.25 } }
+            paint: { 'raster-opacity': 1, 'raster-fade-duration': 0 } }
         ]
       },
       center: [104.6, 33],
