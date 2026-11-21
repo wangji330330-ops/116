@@ -1275,7 +1275,7 @@
         id: 'city-3d', type: 'fill-extrusion', source: 'city3d',
         paint: {
           'fill-extrusion-color': ['interpolate', ['linear'], ['get', 'red'],
-            0, '#e9c9a8', 3, '#e08d7a', 8, '#cf4a4a', 16, '#a8121f'],
+            0, '#efdfc0', 3, '#dfa478', 8, '#c05a46', 16, '#8f2422'],
           /* 只要一点起伏：基地 2km，每处红色场馆 +1.5km，
              最高约 33km（约省域宽度的 3%），是浅浅的浮雕而非高塔 */
           'fill-extrusion-height': ['+', 2000, ['*', ['get', 'red'], 1500]],
@@ -1325,6 +1325,26 @@
     return [];
   }
 
+
+  /* 四类手绘图标：旧址=红旗 故居=小屋 陵园=纪念碑 馆=五角星 */
+  function venueIconSvg(name) {
+    const C = '#b8342e';
+    let body;
+    if (/陵园|烈士/.test(name)) {
+      body = '<polygon points="12,2 6,3 7.5,15 16.5,15 18,3" fill="' + C + '"/>' +
+             '<rect x="4.5" y="15" width="15" height="3.2" rx="0.8" fill="' + C + '"/>';
+    } else if (/故居/.test(name)) {
+      body = '<polygon points="12,2.5 21,10 3,10" fill="' + C + '"/>' +
+             '<rect x="5.6" y="10" width="12.8" height="10.4" rx="0.8" fill="' + C + '"/>';
+    } else if (/旧址|遗址|标语/.test(name)) {
+      body = '<rect x="5.2" y="3" width="2.6" height="18" rx="1" fill="' + C + '"/>' +
+             '<polygon points="7.8,3.4 20,7.2 7.8,11" fill="' + C + '"/>';
+    } else {
+      body = '<polygon points="12,2 14.6,8.6 21.6,9 16.2,13.4 18,20.2 12,16.4 6,20.2 7.8,13.4 2.4,9 9.4,8.6" fill="' + C + '"/>';
+    }
+    return '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">' + body + '</svg>';
+  }
+
   function makeVenuePin(v) {
     const wrap = document.createElement('div');
     wrap.className = 'pinwrap';
@@ -1333,7 +1353,7 @@
     el.className = 'pin pin--venue';
     el.setAttribute('aria-label', v.name);
     el.innerHTML =
-      '<span class="pin__ring"></span><span class="pin__dot"></span>' +
+      '<span class="pin__ring"></span><span class="pin__dot">' + venueIconSvg(v.name) + '</span>' +
       '<span class="pin__card"><span class="pin__name"></span></span>';
     el.querySelector('.pin__name').textContent = v.name;
     el.addEventListener('click', ev => {
@@ -1772,33 +1792,31 @@
       id: 'prov-fill', type: 'fill', source: 'prov', filter: provF,
       paint: {
         'fill-color': ['case',
-          ['boolean', ['feature-state', 'selected'], false], RED,
-          ['boolean', ['feature-state', 'hover'], false], '#e8576b',
-          RED],
+          ['boolean', ['feature-state', 'selected'], false], '#f3e6cb',
+          ['boolean', ['feature-state', 'hover'], false], '#f8efd9',
+          '#fbf6ea'],
         /* 未选中的省份淡化，只留极浅底色 */
         'fill-opacity': ['case',
-          ['boolean', ['feature-state', 'dim'], false], 0.012,
-          ['boolean', ['feature-state', 'selected'], false],
-            ['interpolate', ['linear'], ['zoom'], 4, 0.28, 6.5, 0.15, 9, 0.06],
-          ['boolean', ['feature-state', 'hover'], false], 0.16,
-          ['interpolate', ['linear'], ['zoom'], 4, 0.07, 7, 0.03]]
+          ['boolean', ['feature-state', 'dim'], false], 0.20,
+          ['boolean', ['feature-state', 'selected'], false], 0.66,
+          ['boolean', ['feature-state', 'hover'], false], 0.50, 0.26]
       }
     });
     map.addLayer({
       id: 'prov-line', type: 'line', source: 'prov', filter: provF,
       paint: {
         'line-color': ['case',
-          ['boolean', ['feature-state', 'dim'], false], '#b6b1a6',
-          ['boolean', ['feature-state', 'selected'], false], RED_DEEP,
-          '#a83a48'],
+          ['boolean', ['feature-state', 'dim'], false], '#cfc3ab',
+          ['boolean', ['feature-state', 'selected'], false], '#9e2e2e',
+          '#c0a98a'],
         'line-width': ['case',
           ['boolean', ['feature-state', 'dim'], false], 0.5,
           ['boolean', ['feature-state', 'selected'], false], 2.8,
           ['boolean', ['feature-state', 'hover'], false], 1.6, 0.85],
         'line-opacity': ['case',
-          ['boolean', ['feature-state', 'dim'], false], 0.20,
+          ['boolean', ['feature-state', 'dim'], false], 0.45,
           ['boolean', ['feature-state', 'selected'], false], 1,
-          ['boolean', ['feature-state', 'hover'], false], 0.9, 0.55]
+          ['boolean', ['feature-state', 'hover'], false], 0.95, 0.80]
       }
     });
     map.addLayer({
@@ -1812,11 +1830,11 @@
     /* 红色传承高亮：只填该地块本身，天然不会溢出到相邻行政区 */
     map.addLayer({
       id: 'redfocus-fill', type: 'fill', source: 'redfocus',
-      paint: { 'fill-color': RED, 'fill-opacity': 0.20 }
+      paint: { 'fill-color': '#b8342e', 'fill-opacity': 0.16 }
     });
     map.addLayer({
       id: 'redfocus-line', type: 'line', source: 'redfocus',
-      paint: { 'line-color': RED_DEEP, 'line-width': 3, 'line-opacity': 0.95 }
+      paint: { 'line-color': '#8f2422', 'line-width': 3, 'line-opacity': 0.95 }
     });
     /* 同级上下文：当前区域的「兄弟」行政区，保持可见且可点击，
        随时可以直接跳到别的省 / 市 / 区县，不必先退回上一级 */
@@ -1840,16 +1858,18 @@
     map.addLayer({
       id: 'detail-fill', type: 'fill', source: 'detail',
       paint: {
-        'fill-color': ['case', ['boolean', ['feature-state', 'core'], false], '#d94a5f', RED],
+        'fill-color': ['case',
+          ['boolean', ['feature-state', 'core'], false], '#f6e7c6', '#f8efdb'],
         'fill-opacity': ['case',
-          ['boolean', ['feature-state', 'selected'], false], 0.34,
-          ['*', ['coalesce', ['feature-state', 'reveal'], 0], 0.15]]
+          ['boolean', ['feature-state', 'selected'], false], 0.46,
+          ['*', ['coalesce', ['feature-state', 'reveal'], 0], 0.40]]
       }
     });
     map.addLayer({
       id: 'detail-line', type: 'line', source: 'detail',
       paint: {
-        'line-color': ['case', ['boolean', ['feature-state', 'selected'], false], RED_DEEP, GOLD],
+        'line-color': ['case',
+          ['boolean', ['feature-state', 'selected'], false], '#9e2e2e', '#c9b18e'],
         'line-width': ['case',
           ['boolean', ['feature-state', 'selected'], false], 2.8,
           ['*', ['coalesce', ['feature-state', 'reveal'], 0], 1.5]],
@@ -1958,7 +1978,7 @@
           detail: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } }
         },
         layers: [
-          { id: 'bg', type: 'background', paint: { 'background-color': '#0a1322' } },
+          { id: 'bg', type: 'background', paint: { 'background-color': '#e3edee' } },
           /* 高德标准图在 z<3 为空白瓦片；卫星图仅用于地球阶段。
              两图层靠 visibility 切换，避免同时拉取两套瓦片。
              raster-fade-duration 设为 0：省去新旧瓦片逐帧混合的开销 */
@@ -1966,7 +1986,8 @@
             paint: { 'raster-opacity': 1, 'raster-fade-duration': 0 } },
           { id: 'vec', type: 'raster', source: 'vec',
             layout: { visibility: 'none' },
-            paint: { 'raster-opacity': 1, 'raster-fade-duration': 0 } }
+            paint: { 'raster-opacity': 0.58, 'raster-fade-duration': 0,
+                     'raster-saturation': -0.42, 'raster-contrast': -0.04 } }
         ]
       },
       center: [104.6, 33],

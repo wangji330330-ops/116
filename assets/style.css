@@ -832,3 +832,39 @@ body.lbl-compact .pin--prov .pin__name { font-size: 10.5px; }
   .pin.is-on .pin__ring { animation: none; }
   .hint__ico { animation: none; }
 }
+
+
+/* ================= 导览图皮肤 ================= */
+:root {
+  --paper: #f7f1e3;
+  --sea: #e3edee;
+  --brick: #9e2e2e;
+  --sand: #c9b18e;
+}
+
+.maplibregl-canvas { background: var(--sea); }
+
+/* 地名 / 标签改用楷体，贴近手绘导览图 */
+.pin__name { font-family: "KaiTi", "STKaiti", "楷体", var(--font); letter-spacing: .2px; }
+
+/* 图例色块 */
+.sw { width: 14px; height: 10px; border-radius: 2px; display: inline-block; }
+.sw--prov { background: transparent; border-top: 3px solid var(--brick); height: 0; border-radius: 0; }
+.sw--region { background: #f8efdb; border: 1px solid var(--sand); }
+.sw--venue { width: 10px; height: 10px; border-radius: 50%; background: #b8342e; border: 1.5px solid #fff6e6; }
+.sw--cluster {
+  width: 18px; height: 18px; border-radius: 50%; background: #b8342e; color: #fff6e6;
+  font-size: 9px; font-weight: 700; line-height: 18px; text-align: center;
+  border: 1.5px solid #fff6e6;
+}
+.legend__item { display: flex; align-items: center; gap: 8px; }
+
+/* 场馆图标点位 */
+.pin--venue .pin__dot {
+  width: 15px; height: 15px; border: none; background: transparent; box-shadow: none;
+}
+.pin--venue .pin__dot svg { width: 15px; height: 15px; display: block; }
+.pin--venue:hover .pin__dot { transform: scale(1.25); }
+.pin--venue:hover .pin__dot svg path,
+.pin--venue:hover .pin__dot svg polygon,
+.pin--venue:hover .pin__dot svg rect { fill: #d8352c; }
