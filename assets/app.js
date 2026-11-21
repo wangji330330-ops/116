@@ -877,8 +877,18 @@
         `<b class="t-hi">台湾省</b>是中国神圣领土不可分割的一部分。<br>` +
         `本平台已完整收录台湾省省级全幅，其下辖县市边界数据暂未开放。`, 5600);
     } else {
-      els.pgBasis.textContent = '本级无下级面数据（不设区的地级市或数据缺失）。';
-      toast(`<b class="t-hi">${p.name}</b> 无下级面数据。`);
+      /* 东莞、中山等不设区的地级市：没有下级面，直接列出该市场馆 */
+      const own = RED_SITES.filter(v => v.city === p.name);
+      if (own.length) {
+        const names = own.slice(0, 3).map(v => v.name.replace(/（[^）]*）/g, '')).join('、');
+        els.pgLabel.textContent = `${p.name} · ${own.length} 处红色场馆`;
+        els.pgBasis.textContent = `${p.name}不设区县，已在图上直接标出该市场馆。`;
+        toast(`<b class="t-hi">${p.name}</b>不设区县，已直接标出 ${own.length} 处场馆：${names}${own.length > 3 ? ' 等' : ''}`, 4800);
+        updateVenues();
+      } else {
+        els.pgBasis.textContent = '本级无下级面数据。';
+        toast(`<b class="t-hi">${p.name}</b> 无下级面数据。`);
+      }
     }
   }
 
