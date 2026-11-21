@@ -2047,7 +2047,15 @@
       }
     });
 
-    map.on('moveend', () => { applyBasemap(); updateLabelMode(); scheduleDeclutter(); updateRedFocus(); scheduleVenueZoom(); });
+    let stdHintShown = false;
+    map.on('moveend', () => {
+      applyBasemap(); updateLabelMode(); scheduleDeclutter(); updateRedFocus(); scheduleVenueZoom();
+      /* 标准地图原图 1:178 万，放到街道级会糊，提示一次 */
+      if (baseMode === 'std' && !stdHintShown && map.getZoom() > 10.6) {
+        stdHintShown = true;
+        toast('标准地图原图精度有限，看街道细节可点右上角切到<b class="t-hi">卫星影像</b>', 4600);
+      }
+    });
     map.on('zoom', () => { applyBasemap(); updateLabelMode(); });
     map.on('resize', () => { scheduleDeclutter(); updateRedFocus(); scheduleVenueZoom(); });
   }
