@@ -1627,16 +1627,45 @@
       <p>马晟焘　王术清　伍晟楠　刘嘉韡　林熹桐　曾庆均</p>
       <p style="font-size:11px;color:#86868b">（按姓氏笔画排名）</p>
 
-      <h3>数据与资源致谢</h3>
-      <p>本作品使用了以下公开网络资源，谨致谢意：</p>
+      <h3>资源与致谢</h3>
+      <p>本作品使用的公开资源如下，逐一注明来源，谨致谢意。</p>
       <table>
-        <tr><th>资源</th><th>提供方</th><th>用途</th></tr>
-        <tr><td>高德地图瓦片服务</td><td>高德开放平台（lbs.amap.com）</td><td>标准底图与卫星影像</td></tr>
-        <tr><td>高德地理编码服务</td><td>高德开放平台</td><td>64 处场馆经纬度解析</td></tr>
-        <tr><td>DataV.GeoAtlas 行政区划</td><td>阿里云计算有限公司</td><td>全国省 / 市 / 区县行政界线</td></tr>
-        <tr><td>MapLibre GL JS</td><td>MapLibre 开源社区</td><td>地图渲染引擎</td></tr>
-        <tr><td>广东革命文化与红色记忆场馆名录</td><td>课程教学方案附件二</td><td>场馆名称与地址</td></tr>
+        <tr><th>资源</th><th>提供方</th><th>本作品中的用途</th></tr>
+        <tr>
+          <td>广东省标准地图（政区版分县设色·有邻区）<br>审图号 粤S（2020）103号</td>
+          <td>广东省自然资源厅<br>广东省公共地图服务系统</td>
+          <td>主底图，提供行政界线与分县设色</td>
+        </tr>
+        <tr>
+          <td>高德地图瓦片服务</td>
+          <td>高德开放平台</td>
+          <td>卫星影像与标准底图两档备选底图</td>
+        </tr>
+        <tr>
+          <td>高德地理编码服务</td>
+          <td>高德开放平台</td>
+          <td>按公布地址解析 64 处场馆的经纬度</td>
+        </tr>
+        <tr>
+          <td>DataV.GeoAtlas 行政区划</td>
+          <td>阿里云计算有限公司</td>
+          <td>省、市、区县三级界线，供逐级下钻使用</td>
+        </tr>
+        <tr>
+          <td>MapLibre GL JS</td>
+          <td>MapLibre 开源社区</td>
+          <td>地图渲染与交互引擎</td>
+        </tr>
+        <tr>
+          <td>《广东革命文化与红色记忆场馆名录》</td>
+          <td>课程教学方案附件二</td>
+          <td>场馆名称、所属地与详细地址</td>
+        </tr>
       </table>
+      <p style="font-size:11.5px;color:#86868b">
+        上述机构与开源社区将数据和服务公开，本作品方能完成。本作品仅用于课程学习与公益展示，
+        未用于任何商业用途；底图版权归原提供方所有，行政界线未作改动。
+      </p>
 
       <div class="note">
         <strong>关于国家版图：</strong>本作品严格遵循《地图管理条例》与国家标准地图。
@@ -1645,7 +1674,6 @@
       </div>
 
       <h3>红色场馆名录（${RED_SITES.length} 处 · 按省 › 市 › 区县 › 乡镇 分层）</h3>
-      <input class="panel__search" id="tree-q" type="search" placeholder="在名录中搜索场馆…" autocomplete="off" />
       <div class="tree" id="red-tree"></div>
     `;
   }
