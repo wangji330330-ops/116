@@ -1572,9 +1572,13 @@
     return hay.includes(q.toLowerCase());
   }
 
-  function renderNode(node, q) {
+  /* 展开状态：刷新后保持，默认只展开「广东省」这一层 */
+  const treeOpen = new Set(['广东省']);
+
+  function renderNode(node, q, parentPath) {
+    const selfPath = parentPath ? parentPath + '/' + node.name : node.name;
     const kids = [...node.children.values()]
-      .map(c => renderNode(c, q))
+      .map(c => renderNode(c, q, selfPath))
       .filter(Boolean);
 
     const own = node.sites.filter(s => siteMatches(s, q));
@@ -1585,15 +1589,15 @@
     const list = own.length
       ? `<ul>${own.map(s => `<li><button data-site="${esc(s.name)}">${hl(s.name, q)}<span class="s-addr">${esc(s.addr)}</span></button></li>`).join('')}</ul>`
       : '';
-    const open = q ? ' open' : (node.depth <= 2 ? ' open' : '');
-    return `<details${open} class="lv${node.depth}">${head}${kids.join('')}${list}</details>`;
+    const open = (q ? true : treeOpen.has(selfPath)) ? ' open' : '';
+    return `<details${open} class="lv${node.depth}" data-path="${esc(selfPath)}">${head}${kids.join('')}${list}</details>`;
   }
 
   function renderTree(q) {
     const box = document.getElementById('red-tree');
     if (!box) return;
     const tree = buildRedTree();
-    box.innerHTML = renderNode(tree, q || '') || '<p style="color:#86868b">没有匹配的场馆</p>';
+    box.innerHTML = renderNode(tree, q || '', '') || '<p style="color:#86868b">没有匹配的场馆</p>';
   }
   function buildAbout() {
     return `
@@ -1686,6 +1690,18 @@
     els.panelBody.scrollTop = 0;
 
     renderTree('');
+
+    const treeBox = $('red-tree');
+    if (treeBox && !treeBox.dataset.bound) {
+      treeBox.dataset.bound = '1';
+      /* toggle 不冒泡，用捕获阶段监听 */
+      treeBox.addEventListener('toggle', ev => {
+        const d = ev.target;
+        if (!d || d.tagName !== 'DETAILS' || !d.dataset.path) return;
+        if (d.open) treeOpen.add(d.dataset.path);
+        else treeOpen.delete(d.dataset.path);
+      }, true);
+    }
 
     const tq = $('tree-q');
     if (tq) {
