@@ -2010,7 +2010,7 @@
         projection: { type: 'globe' },
         sources: {
           sat:  { type: 'raster', tiles: AMAP_SAT, tileSize: 256, maxzoom: 18,
-                  attribution: '底图 © 高德地图 | 界线 © DataV.GeoAtlas' },
+                  attribution: '底图 © 高德地图 | 标准地图 粤S(2023)049号 | 界线 © DataV.GeoAtlas' },
           vec:  { type: 'raster', tiles: AMAP_STREET, tileSize: 256, maxzoom: 18 },
           /* 广东省标准地图（粤S(2023)049号）按经纬度配准后贴到地图上 */
           gdstd: { type: 'image', url: './data/gd-standard.png',
