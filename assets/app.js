@@ -707,6 +707,12 @@
   function drillProvince(row) {
     const f = featOf(row);
     if (!onlyGuangdong(propsOf(f).name)) return Promise.resolve();
+
+    /* 落在广东 → 自动换成广东省标准地图作为底图 */
+    baseMode = 'std';
+    syncBaseBtn();
+    applyBasemap(true);
+
     current.level = 1;
     current.province = f;
     current.city = null;
@@ -929,6 +935,13 @@
 
   /* ============================ 回到全国 ============================ */
   async function resetToChina({ animate = true } = {}) {
+    /* 回到全国视图 → 换回卫星影像，方便看其他省份 */
+    if (baseMode === 'std') {
+      baseMode = 'sat';
+      syncBaseBtn();
+      if (typeof applyBasemap === 'function') applyBasemap(true);
+    }
+
     const my = ++runToken;
     clearAllPins();
     clearVenues();
@@ -1718,8 +1731,9 @@
   }
 
   /* ============================ 底图切换 ============================ */
-  /* 默认广东省标准地图；右上角可切标准底图 / 卫星影像 */
-  let baseMode = 'std';
+  /* 开局卫星影像（可看全国）；进入广东后自动切标准地图 */
+  let baseMode = 'sat';
+  let syncBaseBtn = () => {};
   let baseApplied = null;
 
   function applyBasemap(force) {
@@ -1821,7 +1835,7 @@
     const btnBase = document.getElementById('btn-basemap');
     const CYCLE = { sat: 'vec', vec: 'std', std: 'sat' };
     const NEXT_LABEL = { sat: '卫', vec: '标', std: '粤' };   /* 显示「点一下会切到哪个」 */
-    const syncBaseBtn = () => {
+    syncBaseBtn = () => {
       const nxt = CYCLE[baseMode];
       btnBase.classList.toggle('is-on', baseMode === 'sat');
       btnBase.textContent = NEXT_LABEL[nxt];
